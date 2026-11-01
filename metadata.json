@@ -1,0 +1,6 @@
+{
+  "name": "Motivation, Education and Research",
+  "description": "This Blog is dedicated to motivate the reader and educate them to understand new things and integrate them in research, by Prof. Sulekh Kumar.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
