@@ -46,6 +46,24 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   headerBgImage: "/ocean-header.jpg"
 };
 
+export const EMPTY_SITE_SETTINGS: SiteSettings = {
+  siteTitle: "",
+  tagline: "",
+  headerBgImage: "/ocean-header.jpg"
+};
+
+export const EMPTY_AUTHOR_PROFILE: AuthorProfile = {
+  name: "",
+  fullTitle: "",
+  avatar: "",
+  bio: "",
+  district: "",
+  education: [],
+  currentRole: "",
+  researchInterests: [],
+  bloggerProfileUrl: ""
+};
+
 export const AUTHOR_PROFILE: AuthorProfile = {
   name: "Prof. Sulekh Kumar",
   fullTitle: "PROF. SULEKH KUMAR(QUALIFIED UGC NET DEC-2024 & 2025 FOR ASSISTANT PROFESSOR & ADMISSION TO PH.D. IN COMPUTER SCIENCE & APPLICATION)",

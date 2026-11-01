@@ -52,32 +52,49 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Circular Avatar */}
         <div
           onClick={onOpenProfile}
-          className="w-28 h-28 rounded-full overflow-hidden shadow-sm border border-gray-100 bg-gray-50 mb-4 cursor-pointer hover:opacity-90 transition"
+          className="w-28 h-28 rounded-full overflow-hidden shadow-sm border border-gray-100 bg-gray-100 mb-4 cursor-pointer hover:opacity-90 transition flex items-center justify-center"
         >
-          <img
-            src={profile.avatar}
-            alt={profile.name}
-            className="w-full h-full object-cover object-top"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = '/author-profile.png';
-            }}
-          />
+          {profile.avatar ? (
+            <img
+              src={profile.avatar}
+              alt={profile.name || 'Author'}
+              className="w-full h-full object-cover object-top"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = '/author-profile.png';
+              }}
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center text-gray-400 p-2">
+              <span className="text-3xl font-light">👤</span>
+              <span className="text-[10px] text-gray-500 mt-1">Add Photo</span>
+            </div>
+          )}
         </div>
 
         {/* Author Name */}
         <h2 className="text-sm font-bold text-[#212121] uppercase tracking-wide leading-snug px-1">
-          {profile.name}
+          {profile.name || (
+            <span className="text-gray-400 italic">Your Name</span>
+          )}
         </h2>
         {/* Subtitle / Designation */}
-        {profile.fullTitle && profile.fullTitle !== profile.name && (
+        {profile.fullTitle ? (
           <p className="text-[11px] font-semibold text-[#00acc1] uppercase tracking-wide mt-1 px-1">
             {profile.fullTitle}
+          </p>
+        ) : (
+          <p className="text-[11px] text-gray-400 italic mt-0.5 px-1">
+            (Add your title / designation)
           </p>
         )}
 
         {/* Bio paragraph */}
         <p className="mt-3 text-xs leading-relaxed text-[#757575] px-1 font-light text-justify sm:text-center">
-          {profile.bio}
+          {profile.bio || (
+            <span className="text-gray-400 italic">
+              Click 'Edit' to enter your bio, education, and district details.
+            </span>
+          )}
         </p>
 
         {/* Buttons: Visit Profile & Edit Profile */}

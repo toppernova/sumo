@@ -50,24 +50,32 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
         {/* Avatar floating */}
         <div className="px-6 relative -mt-14 pb-6">
-          <div className="w-24 h-24 rounded-full border-4 border-white shadow-md overflow-hidden bg-gray-100">
-            <img
-              src={profile.avatar}
-              alt={profile.name}
-              className="w-full h-full object-cover object-top"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = '/author-profile.png';
-              }}
-            />
+          <div className="w-24 h-24 rounded-full border-4 border-white shadow-md overflow-hidden bg-gray-100 flex items-center justify-center">
+            {profile.avatar ? (
+              <img
+                src={profile.avatar}
+                alt={profile.name || 'Author'}
+                className="w-full h-full object-cover object-top"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/author-profile.png';
+                }}
+              />
+            ) : (
+              <span className="text-4xl text-gray-400">👤</span>
+            )}
           </div>
 
           <div className="mt-3">
             <h2 id="profile-title" className="text-xl font-bold text-gray-900">
-              {profile.name}
+              {profile.name || 'Your Name'}
             </h2>
-            {profile.fullTitle && (
+            {profile.fullTitle ? (
               <p className="text-xs font-semibold text-[#00acc1] mt-1 uppercase tracking-wide">
                 {profile.fullTitle}
+              </p>
+            ) : (
+              <p className="text-xs text-gray-400 italic mt-0.5">
+                (Click 'Edit Details' to set title)
               </p>
             )}
           </div>

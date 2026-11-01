@@ -8,6 +8,8 @@ import {
   BLOG_POSTS,
   AUTHOR_PROFILE,
   DEFAULT_SITE_SETTINGS,
+  EMPTY_AUTHOR_PROFILE,
+  EMPTY_SITE_SETTINGS,
   BlogPost,
   Comment,
   AuthorProfile,
@@ -32,7 +34,20 @@ import { AdminBar } from './components/AdminBar';
 import { PostEditorModal } from './components/PostEditorModal';
 import { ProfileEditorModal } from './components/ProfileEditorModal';
 import { SiteSettingsModal } from './components/SiteSettingsModal';
-import { X, Search, AlertCircle } from 'lucide-react';
+import { SupabaseConnectModal } from './components/SupabaseConnectModal';
+import { VercelDeployModal } from './components/VercelDeployModal';
+import {
+  isSupabaseConfigured,
+  fetchSupabasePosts,
+  fetchSupabaseProfile,
+  fetchSupabaseSettings,
+  upsertSupabasePost,
+  deleteSupabasePost,
+  upsertSupabaseProfile,
+  upsertSupabaseSettings,
+  addSupabaseComment,
+} from './lib/supabase';
+import { X, Search, AlertCircle, Sparkles, Plus, User, Settings, Trash2 } from 'lucide-react';
 
 const STORAGE_KEY_POSTS = 'sulekh_blog_posts_v2';
 const STORAGE_KEY_AUTHOR = 'sulekh_blog_author_v2';
@@ -117,6 +132,38 @@ export default function App() {
   const [isProfileEditorOpen, setIsProfileEditorOpen] = useState(false);
   const [isSiteSettingsOpen, setIsSiteSettingsOpen] = useState(false);
   const [postToDelete, setPostToDelete] = useState<BlogPost | null>(null);
+  const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
+  const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
+  const [isVercelModalOpen, setIsVercelModalOpen] = useState(false);
+  const [isSupabaseConnected, setIsSupabaseConnected] = useState(() => isSupabaseConfigured());
+
+  // Cloud sync handler: loads initial data from Supabase if connected
+  const refreshSupabaseData = async () => {
+    const configured = isSupabaseConfigured();
+    setIsSupabaseConnected(configured);
+    if (!configured) return;
+
+    try {
+      const cloudPosts = await fetchSupabasePosts();
+      if (cloudPosts && cloudPosts.length > 0) {
+        setPosts(cloudPosts);
+      }
+      const cloudProfile = await fetchSupabaseProfile();
+      if (cloudProfile && cloudProfile.name) {
+        setProfile(cloudProfile);
+      }
+      const cloudSettings = await fetchSupabaseSettings();
+      if (cloudSettings && cloudSettings.siteTitle) {
+        setSiteSettings(cloudSettings);
+      }
+    } catch (e) {
+      console.warn('Error loading from Supabase:', e);
+    }
+  };
+
+  useEffect(() => {
+    refreshSupabaseData();
+  }, []);
 
   // Viewer Modals & Drawers
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -188,6 +235,10 @@ export default function App() {
       ...prev,
       [postId]: [newComment, ...(prev[postId] || [])],
     }));
+
+    if (isSupabaseConnected) {
+      addSupabaseComment(postId, newComment);
+    }
   };
 
   // Post Actions
@@ -218,6 +269,18 @@ export default function App() {
           published: data.date ? new Date(data.date).toISOString() : prev.published,
         } : null);
       }
+
+      if (isSupabaseConnected) {
+        const target = posts.find((p) => p.id === data.id);
+        if (target) {
+          upsertSupabasePost({
+            ...target,
+            title: data.title,
+            content: data.content,
+            published: data.date ? new Date(data.date).toISOString() : target.published,
+          });
+        }
+      }
     } else {
       // Create new post
       const newPost = createBlogPost(
@@ -225,12 +288,19 @@ export default function App() {
         { name: profile.name, title: profile.fullTitle, avatar: profile.avatar }
       );
       setPosts((prev) => [newPost, ...prev]);
+
+      if (isSupabaseConnected) {
+        upsertSupabasePost(newPost);
+      }
     }
   };
 
   const confirmDeletePost = () => {
     if (!postToDelete) return;
     setPosts((prev) => deleteBlogPost(prev, postToDelete.id));
+    if (isSupabaseConnected) {
+      deleteSupabasePost(postToDelete.id);
+    }
     if (selectedPost && selectedPost.id === postToDelete.id) {
       setSelectedPost(null);
     }
@@ -240,6 +310,9 @@ export default function App() {
   // Profile and Settings Actions
   const handleSaveProfile = (newProfile: AuthorProfile) => {
     setProfile(newProfile);
+    if (isSupabaseConnected) {
+      upsertSupabaseProfile(newProfile);
+    }
     // Also update author info on user's newly written posts
     setPosts((prev) =>
       prev.map((p) => ({
@@ -256,19 +329,36 @@ export default function App() {
   const handleSaveSiteSettings = (newSettings: SiteSettings) => {
     setSiteSettings(newSettings);
     document.title = newSettings.siteTitle;
+    if (isSupabaseConnected) {
+      upsertSupabaseSettings(newSettings);
+    }
   };
 
-  // Reset to original demo data
-  const handleResetData = () => {
-    if (window.confirm('Reset all posts, profile, and settings back to original Sulekh blog data?')) {
-      setPosts(BLOG_POSTS);
-      setProfile(AUTHOR_PROFILE);
-      setSiteSettings(DEFAULT_SITE_SETTINGS);
-      setCommentsMap(INITIAL_COMMENTS);
-      setSelectedPost(null);
-      setSelectedArchive('');
-      setSearchQuery('');
-    }
+  // Clear everything to empty details (as requested: reset karne se empty details hona chahiye)
+  const handleClearToEmpty = () => {
+    setIsClearConfirmOpen(true);
+  };
+
+  const executeClearToEmpty = () => {
+    setPosts([]);
+    setProfile(EMPTY_AUTHOR_PROFILE);
+    setSiteSettings(EMPTY_SITE_SETTINGS);
+    setCommentsMap({});
+    setSelectedPost(null);
+    setSelectedArchive('');
+    setSearchQuery('');
+    setIsClearConfirmOpen(false);
+  };
+
+  // Optional: Restore original demo posts if needed
+  const handleLoadDemoData = () => {
+    setPosts(BLOG_POSTS);
+    setProfile(AUTHOR_PROFILE);
+    setSiteSettings(DEFAULT_SITE_SETTINGS);
+    setCommentsMap(INITIAL_COMMENTS);
+    setSelectedPost(null);
+    setSelectedArchive('');
+    setSearchQuery('');
   };
 
   // Export JSON backup
@@ -353,9 +443,13 @@ export default function App() {
         onNewPost={handleOpenNewPost}
         onEditProfile={() => setIsProfileEditorOpen(true)}
         onSiteSettings={() => setIsSiteSettingsOpen(true)}
-        onResetData={handleResetData}
+        onClearToEmpty={handleClearToEmpty}
+        onLoadDemoData={handleLoadDemoData}
         onExportData={handleExportData}
         onImportData={handleImportData}
+        isSupabaseConnected={isSupabaseConnected}
+        onOpenSupabase={() => setIsSupabaseModalOpen(true)}
+        onOpenVercelDeploy={() => setIsVercelModalOpen(true)}
       />
 
       {/* Top Header */}
@@ -480,6 +574,41 @@ export default function App() {
                       </div>
                     )}
                   </div>
+                ) : posts.length === 0 ? (
+                  <div className="blog-card bg-white p-8 sm:p-12 text-center rounded-sm border-t-4 border-[#00acc1]">
+                    <div className="w-16 h-16 rounded-full bg-teal-50 text-[#00acc1] mx-auto flex items-center justify-center mb-4">
+                      <Sparkles size={30} />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 mb-2 font-roboto">
+                      Aapka Blog Empty Hai & Ready Hai!
+                    </h3>
+                    <p className="text-gray-600 text-xs sm:text-sm max-w-md mx-auto mb-6 leading-relaxed font-roboto">
+                      Sabhi details empty kar diye gaye hain. Ab aap apna pehla post add kar sakte hain, aur apni photo, naam aur biography set kar sakte hain.
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-3">
+                      <button
+                        onClick={handleOpenNewPost}
+                        className="inline-flex items-center gap-1.5 px-6 py-2.5 bg-[#00acc1] hover:bg-[#00838f] text-white text-xs font-bold uppercase tracking-wider rounded transition cursor-pointer shadow-sm"
+                      >
+                        <Plus size={15} />
+                        <span>+ Create First Post</span>
+                      </button>
+                      <button
+                        onClick={() => setIsProfileEditorOpen(true)}
+                        className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold uppercase tracking-wider rounded transition cursor-pointer"
+                      >
+                        <User size={14} className="text-[#00acc1]" />
+                        <span>Set My Profile</span>
+                      </button>
+                      <button
+                        onClick={() => setIsSiteSettingsOpen(true)}
+                        className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold uppercase tracking-wider rounded transition cursor-pointer"
+                      >
+                        <Settings size={14} className="text-[#00acc1]" />
+                        <span>Set Blog Title</span>
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   <div className="blog-card bg-white p-12 text-center rounded-sm">
                     <p className="text-gray-600 text-sm mb-4">
@@ -558,6 +687,37 @@ export default function App() {
         </div>
       )}
 
+      {/* Clear All to Empty Confirmation Modal */}
+      {isClearConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-lg shadow-2xl max-w-sm w-full p-6 text-center space-y-4 border border-red-100">
+            <div className="w-14 h-14 rounded-full bg-red-100 text-red-600 mx-auto flex items-center justify-center">
+              <Trash2 size={26} />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-gray-900">Reset to Empty Details?</h3>
+              <p className="text-xs text-gray-600 mt-2 leading-relaxed font-roboto">
+                Kya aap saare demo details empty karna chahte hain? Sabhi posts aur profile details empty ho jayengi taaki aap apna sara details shuru se add kar sakein.
+              </p>
+            </div>
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <button
+                onClick={() => setIsClearConfirmOpen(false)}
+                className="px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={executeClearToEmpty}
+                className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded uppercase tracking-wider cursor-pointer shadow-xs"
+              >
+                Yes, Empty All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modals */}
       <PostEditorModal
         isOpen={isPostEditorOpen}
@@ -595,6 +755,24 @@ export default function App() {
       <ReportAbuseModal
         isOpen={isReportAbuseOpen}
         onClose={() => setIsReportAbuseOpen(false)}
+      />
+
+      <SupabaseConnectModal
+        isOpen={isSupabaseModalOpen}
+        onClose={() => setIsSupabaseModalOpen(false)}
+        posts={posts}
+        profile={profile}
+        settings={siteSettings}
+        onConnectedRefresh={refreshSupabaseData}
+      />
+
+      <VercelDeployModal
+        isOpen={isVercelModalOpen}
+        onClose={() => setIsVercelModalOpen(false)}
+        onOpenSupabaseConnect={() => {
+          setIsVercelModalOpen(false);
+          setIsSupabaseModalOpen(true);
+        }}
       />
     </div>
   );

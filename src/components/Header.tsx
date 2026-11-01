@@ -123,13 +123,22 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={onBackToHome}
             className="font-damion text-4xl sm:text-5xl md:text-6xl text-white font-normal tracking-wide drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)] cursor-pointer hover:opacity-95 transition select-none"
           >
-            {siteTitle || 'Motivation, Education and Research'}
+            {siteTitle || (
+              <span className="opacity-90">My Blog</span>
+            )}
           </h1>
-          {tagline && (
+          {tagline ? (
             <p className="mt-3 text-white/95 text-xs sm:text-sm md:text-base font-light max-w-2xl mx-auto drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] leading-relaxed font-roboto">
               {tagline}
             </p>
-          )}
+          ) : isEditMode ? (
+            <p
+              onClick={onEditHeader}
+              className="mt-2 text-white/80 text-xs font-light max-w-md mx-auto italic cursor-pointer hover:underline"
+            >
+              (Click 'Edit Title' to set your blog title and description)
+            </p>
+          ) : null}
         </div>
 
         {/* Bottom Navigation: HOME tab with active underline */}
