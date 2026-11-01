@@ -14,6 +14,8 @@ interface SidebarProps {
   isMobileOpen: boolean;
   onCloseMobile: () => void;
   isEditMode: boolean;
+  isAdmin?: boolean;
+  onOpenAdminLogin?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -27,6 +29,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isMobileOpen,
   onCloseMobile,
   isEditMode,
+  isAdmin,
+  onOpenAdminLogin,
 }) => {
   const [isArchiveOpen, setIsArchiveOpen] = useState(true);
   const [showAllArchive, setShowAllArchive] = useState(false);
@@ -190,14 +194,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       <div className="w-full border-t border-gray-200/60" />
 
-      {/* Report Abuse Link */}
-      <div>
+      {/* Report Abuse & Discreet Admin Link */}
+      <div className="flex items-center justify-between text-xs pt-1">
         <button
           onClick={onOpenReportAbuse}
           className="text-xs text-[#00acc1] hover:underline cursor-pointer"
         >
           Report Abuse
         </button>
+
+        {!isAdmin && onOpenAdminLogin && (
+          <button
+            onClick={() => {
+              if (isMobileOpen) onCloseMobile();
+              onOpenAdminLogin();
+            }}
+            className="text-[11px] text-gray-400 hover:text-gray-700 transition cursor-pointer"
+            title="Admin Login"
+          >
+            Admin
+          </button>
+        )}
       </div>
     </div>
   );

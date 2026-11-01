@@ -3,18 +3,17 @@ import {
   Plus,
   User,
   Settings,
-  Edit3,
   Trash2,
   Download,
   Upload,
   RotateCcw,
   Database,
   Triangle,
+  LogOut,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface AdminBarProps {
-  isEditMode: boolean;
-  onToggleEditMode: () => void;
   onNewPost: () => void;
   onEditProfile: () => void;
   onSiteSettings: () => void;
@@ -25,11 +24,10 @@ interface AdminBarProps {
   isSupabaseConnected: boolean;
   onOpenSupabase: () => void;
   onOpenVercelDeploy: () => void;
+  onLogout: () => void;
 }
 
 export const AdminBar: React.FC<AdminBarProps> = ({
-  isEditMode,
-  onToggleEditMode,
   onNewPost,
   onEditProfile,
   onSiteSettings,
@@ -40,6 +38,7 @@ export const AdminBar: React.FC<AdminBarProps> = ({
   isSupabaseConnected,
   onOpenSupabase,
   onOpenVercelDeploy,
+  onLogout,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -58,30 +57,20 @@ export const AdminBar: React.FC<AdminBarProps> = ({
   };
 
   return (
-    <div className="bg-gray-900 text-white text-xs border-b border-gray-800 shadow-md sticky top-0 z-40">
+    <div className="bg-gray-950 text-white text-xs border-b border-gray-800 shadow-lg sticky top-0 z-40 font-roboto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex flex-wrap items-center justify-between gap-3">
-        {/* Left: Branding & Edit Mode Toggle */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 font-bold text-white bg-[#00acc1] px-2.5 py-1 rounded text-[11px] uppercase tracking-wide">
-            <Edit3 size={13} />
-            <span>Blog Editor</span>
+        {/* Left: Admin Status Indicator */}
+        <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-1.5 font-bold text-white bg-emerald-600 px-2.5 py-1 rounded text-[11px] uppercase tracking-wide shadow-xs">
+            <ShieldCheck size={13} />
+            <span>Admin Control Panel</span>
           </div>
-
-          <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={isEditMode}
-              onChange={onToggleEditMode}
-              className="sr-only peer"
-            />
-            <div className="w-8 h-4 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3.5 after:transition-all peer-checked:bg-[#00acc1] relative"></div>
-            <span className="text-[11px] text-gray-300 font-medium">
-              {isEditMode ? 'Edit Mode Active' : 'Viewer Mode'}
-            </span>
-          </label>
+          <span className="text-[11px] text-gray-400 hidden sm:inline">
+            (Controls are hidden from public visitors)
+          </span>
         </div>
 
-        {/* Center: Action Buttons */}
+        {/* Center: Main Admin Actions */}
         <div className="flex flex-wrap items-center gap-2">
           {/* New Post Button */}
           <button
@@ -132,11 +121,11 @@ export const AdminBar: React.FC<AdminBarProps> = ({
             title="Step-by-step Vercel + Supabase deployment instructions"
           >
             <Triangle size={12} className="fill-white" />
-            <span>Deploy (Vercel)</span>
+            <span>Deploy Guide</span>
           </button>
         </div>
 
-        {/* Right: Data Export/Import & Clear to Empty */}
+        {/* Right: Data Export/Import, Reset, and Logout */}
         <div className="flex items-center gap-2">
           <button
             onClick={onExportData}
@@ -168,7 +157,7 @@ export const AdminBar: React.FC<AdminBarProps> = ({
             className="inline-flex items-center gap-1 text-[11px] text-red-300 hover:text-white bg-red-950/60 hover:bg-red-800 px-2 py-1 rounded transition cursor-pointer border border-red-800/60 ml-1"
           >
             <Trash2 size={12} />
-            <span>Clear to Empty</span>
+            <span>Empty Details</span>
           </button>
 
           {/* Optional Load Demo button */}
@@ -179,6 +168,16 @@ export const AdminBar: React.FC<AdminBarProps> = ({
           >
             <RotateCcw size={11} />
             <span>Demo</span>
+          </button>
+
+          {/* Log Out Button */}
+          <button
+            onClick={onLogout}
+            title="Exit Admin Mode and return to public reader view"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700 rounded transition border border-gray-700 cursor-pointer ml-1"
+          >
+            <LogOut size={13} />
+            <span>Exit Admin</span>
           </button>
         </div>
       </div>

@@ -31,6 +31,7 @@ import { ProfileModal } from './components/ProfileModal';
 import { ShareModal } from './components/ShareModal';
 import { ReportAbuseModal } from './components/ReportAbuseModal';
 import { AdminBar } from './components/AdminBar';
+import { AdminLoginModal } from './components/AdminLoginModal';
 import { PostEditorModal } from './components/PostEditorModal';
 import { ProfileEditorModal } from './components/ProfileEditorModal';
 import { SiteSettingsModal } from './components/SiteSettingsModal';
@@ -47,7 +48,7 @@ import {
   upsertSupabaseSettings,
   addSupabaseComment,
 } from './lib/supabase';
-import { X, Search, AlertCircle, Sparkles, Plus, User, Settings, Trash2 } from 'lucide-react';
+import { X, Search, AlertCircle, Sparkles, Plus, User, Settings, Trash2, Lock, ShieldCheck } from 'lucide-react';
 
 const STORAGE_KEY_POSTS = 'sulekh_blog_posts_v2';
 const STORAGE_KEY_AUTHOR = 'sulekh_blog_author_v2';
@@ -125,8 +126,26 @@ export default function App() {
   const [selectedArchive, setSelectedArchive] = useState('');
   const [visibleCount, setVisibleCount] = useState(POSTS_PER_PAGE);
 
-  // Admin & Editing Modals State
-  const [isEditMode, setIsEditMode] = useState(true);
+  // Admin Authentication & Edit Mode State (default: false for public readers)
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('sulekh_admin_auth') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [adminPasscode, setAdminPasscode] = useState<string>(() => {
+    try {
+      return localStorage.getItem('sulekh_admin_passcode') || 'admin123';
+    } catch {
+      return 'admin123';
+    }
+  });
+  const [isAdminLoginOpen, setIsAdminLoginOpen] = useState(false);
+
+  // Edit controls are strictly reserved for the authenticated Admin
+  const isEditMode = isAdmin;
+
   const [isPostEditorOpen, setIsPostEditorOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
   const [isProfileEditorOpen, setIsProfileEditorOpen] = useState(false);
@@ -136,6 +155,33 @@ export default function App() {
   const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
   const [isVercelModalOpen, setIsVercelModalOpen] = useState(false);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(() => isSupabaseConfigured());
+
+  const handleAdminLogin = () => {
+    setIsAdmin(true);
+    try {
+      localStorage.setItem('sulekh_admin_auth', 'true');
+    } catch (e) {
+      console.warn('Storage error', e);
+    }
+  };
+
+  const handleAdminLogout = () => {
+    setIsAdmin(false);
+    try {
+      localStorage.removeItem('sulekh_admin_auth');
+    } catch (e) {
+      console.warn('Storage error', e);
+    }
+  };
+
+  const handleUpdatePasscode = (newCode: string) => {
+    setAdminPasscode(newCode);
+    try {
+      localStorage.setItem('sulekh_admin_passcode', newCode);
+    } catch (e) {
+      console.warn('Storage error', e);
+    }
+  };
 
   // Cloud sync handler: loads initial data from Supabase if connected
   const refreshSupabaseData = async () => {
@@ -436,21 +482,22 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#58c6d5] flex flex-col font-roboto selection:bg-[#00acc1] selection:text-white">
-      {/* Blogger Top Admin & Quick Editing Bar */}
-      <AdminBar
-        isEditMode={isEditMode}
-        onToggleEditMode={() => setIsEditMode(!isEditMode)}
-        onNewPost={handleOpenNewPost}
-        onEditProfile={() => setIsProfileEditorOpen(true)}
-        onSiteSettings={() => setIsSiteSettingsOpen(true)}
-        onClearToEmpty={handleClearToEmpty}
-        onLoadDemoData={handleLoadDemoData}
-        onExportData={handleExportData}
-        onImportData={handleImportData}
-        isSupabaseConnected={isSupabaseConnected}
-        onOpenSupabase={() => setIsSupabaseModalOpen(true)}
-        onOpenVercelDeploy={() => setIsVercelModalOpen(true)}
-      />
+      {/* Blogger Top Admin & Quick Editing Bar - EXCLUSIVELY FOR AUTHENTICATED ADMIN */}
+      {isAdmin && (
+        <AdminBar
+          onNewPost={handleOpenNewPost}
+          onEditProfile={() => setIsProfileEditorOpen(true)}
+          onSiteSettings={() => setIsSiteSettingsOpen(true)}
+          onClearToEmpty={handleClearToEmpty}
+          onLoadDemoData={handleLoadDemoData}
+          onExportData={handleExportData}
+          onImportData={handleImportData}
+          isSupabaseConnected={isSupabaseConnected}
+          onOpenSupabase={() => setIsSupabaseModalOpen(true)}
+          onOpenVercelDeploy={() => setIsVercelModalOpen(true)}
+          onLogout={handleAdminLogout}
+        />
+      )}
 
       {/* Top Header */}
       <Header
@@ -481,6 +528,8 @@ export default function App() {
             isMobileOpen={isMobileSidebarOpen}
             onCloseMobile={() => setIsMobileSidebarOpen(false)}
             isEditMode={isEditMode}
+            isAdmin={isAdmin}
+            onOpenAdminLogin={() => setIsAdminLoginOpen(true)}
           />
 
           {/* Main Feed or Single Post View */}
@@ -579,35 +628,48 @@ export default function App() {
                     <div className="w-16 h-16 rounded-full bg-teal-50 text-[#00acc1] mx-auto flex items-center justify-center mb-4">
                       <Sparkles size={30} />
                     </div>
-                    <h3 className="text-xl font-bold text-gray-900 mb-2 font-roboto">
-                      Aapka Blog Empty Hai & Ready Hai!
-                    </h3>
-                    <p className="text-gray-600 text-xs sm:text-sm max-w-md mx-auto mb-6 leading-relaxed font-roboto">
-                      Sabhi details empty kar diye gaye hain. Ab aap apna pehla post add kar sakte hain, aur apni photo, naam aur biography set kar sakte hain.
-                    </p>
-                    <div className="flex flex-wrap justify-center gap-3">
-                      <button
-                        onClick={handleOpenNewPost}
-                        className="inline-flex items-center gap-1.5 px-6 py-2.5 bg-[#00acc1] hover:bg-[#00838f] text-white text-xs font-bold uppercase tracking-wider rounded transition cursor-pointer shadow-sm"
-                      >
-                        <Plus size={15} />
-                        <span>+ Create First Post</span>
-                      </button>
-                      <button
-                        onClick={() => setIsProfileEditorOpen(true)}
-                        className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold uppercase tracking-wider rounded transition cursor-pointer"
-                      >
-                        <User size={14} className="text-[#00acc1]" />
-                        <span>Set My Profile</span>
-                      </button>
-                      <button
-                        onClick={() => setIsSiteSettingsOpen(true)}
-                        className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold uppercase tracking-wider rounded transition cursor-pointer"
-                      >
-                        <Settings size={14} className="text-[#00acc1]" />
-                        <span>Set Blog Title</span>
-                      </button>
-                    </div>
+                    {isAdmin ? (
+                      <>
+                        <h3 className="text-xl font-bold text-gray-900 mb-2 font-roboto">
+                          Aapka Blog Empty Hai & Ready Hai!
+                        </h3>
+                        <p className="text-gray-600 text-xs sm:text-sm max-w-md mx-auto mb-6 leading-relaxed font-roboto">
+                          Sabhi details empty kar diye gaye hain. Ab aap apna pehla post add kar sakte hain, aur apni photo, naam aur biography set kar sakte hain.
+                        </p>
+                        <div className="flex flex-wrap justify-center gap-3">
+                          <button
+                            onClick={handleOpenNewPost}
+                            className="inline-flex items-center gap-1.5 px-6 py-2.5 bg-[#00acc1] hover:bg-[#00838f] text-white text-xs font-bold uppercase tracking-wider rounded transition cursor-pointer shadow-sm"
+                          >
+                            <Plus size={15} />
+                            <span>+ Create First Post</span>
+                          </button>
+                          <button
+                            onClick={() => setIsProfileEditorOpen(true)}
+                            className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold uppercase tracking-wider rounded transition cursor-pointer"
+                          >
+                            <User size={14} className="text-[#00acc1]" />
+                            <span>Set My Profile</span>
+                          </button>
+                          <button
+                            onClick={() => setIsSiteSettingsOpen(true)}
+                            className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold uppercase tracking-wider rounded transition cursor-pointer"
+                          >
+                            <Settings size={14} className="text-[#00acc1]" />
+                            <span>Set Blog Title</span>
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <h3 className="text-xl font-bold text-gray-900 mb-2 font-roboto">
+                          Welcome to {siteSettings.siteTitle || 'Our Blog'}
+                        </h3>
+                        <p className="text-gray-600 text-xs sm:text-sm max-w-md mx-auto leading-relaxed font-roboto">
+                          No posts have been published yet. Please check back soon for articles, motivation, and insights!
+                        </p>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className="blog-card bg-white p-12 text-center rounded-sm">
@@ -615,12 +677,14 @@ export default function App() {
                       No posts found matching your criteria.
                     </p>
                     <div className="flex justify-center gap-3">
-                      <button
-                        onClick={handleOpenNewPost}
-                        className="px-5 py-2 bg-[#00acc1] text-white text-xs font-semibold uppercase tracking-wider rounded transition hover:bg-[#00838f] cursor-pointer"
-                      >
-                        + Create First Post
-                      </button>
+                      {isAdmin && (
+                        <button
+                          onClick={handleOpenNewPost}
+                          className="px-5 py-2 bg-[#00acc1] text-white text-xs font-semibold uppercase tracking-wider rounded transition hover:bg-[#00838f] cursor-pointer"
+                        >
+                          + Create First Post
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           setSearchQuery('');
@@ -640,18 +704,42 @@ export default function App() {
       </div>
 
       {/* Footer */}
-      <footer className="mt-auto bg-black/20 text-white/90 text-xs py-6 border-t border-white/15">
+      <footer className="mt-auto bg-black/25 text-white/90 text-xs py-6 border-t border-white/15">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
           <div>
-            <p className="font-medium">
+            <p className="font-medium text-sm">
               {siteSettings.siteTitle}
             </p>
             <p className="text-white/75 text-[11px] mt-0.5">
               {profile.name} {profile.fullTitle ? `• ${profile.fullTitle.slice(0, 90)}...` : ''}
             </p>
           </div>
-          <div className="text-[11px] text-white/80">
+          <div className="flex flex-col sm:flex-row items-center gap-4 text-[11px] text-white/80">
             <span>Powered by Blogger • All Rights Reserved</span>
+            <div className="border-t sm:border-t-0 sm:border-l border-white/20 pt-2 sm:pt-0 sm:pl-4">
+              {isAdmin ? (
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 text-[11px] bg-emerald-600/90 text-white px-2 py-0.5 rounded font-medium">
+                    <ShieldCheck size={11} /> Admin Active
+                  </span>
+                  <button
+                    onClick={handleAdminLogout}
+                    className="text-[11px] text-white/75 hover:text-white underline cursor-pointer"
+                  >
+                    Log Out
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setIsAdminLoginOpen(true)}
+                  className="inline-flex items-center gap-1 text-white/50 hover:text-white transition cursor-pointer"
+                  title="Admin Sign In"
+                >
+                  <Lock size={11} />
+                  <span>Admin</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </footer>
@@ -744,7 +832,7 @@ export default function App() {
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
         profile={profile}
-        onEdit={() => setIsProfileEditorOpen(true)}
+        onEdit={isAdmin ? () => setIsProfileEditorOpen(true) : undefined}
       />
 
       <ShareModal
@@ -773,6 +861,14 @@ export default function App() {
           setIsVercelModalOpen(false);
           setIsSupabaseModalOpen(true);
         }}
+      />
+
+      <AdminLoginModal
+        isOpen={isAdminLoginOpen}
+        onClose={() => setIsAdminLoginOpen(false)}
+        onLoginSuccess={handleAdminLogin}
+        currentPasscode={adminPasscode}
+        onUpdatePasscode={handleUpdatePasscode}
       />
     </div>
   );
