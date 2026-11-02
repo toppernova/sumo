@@ -3,39 +3,32 @@ import {
   Plus,
   User,
   Settings,
-  Trash2,
   Download,
   Upload,
-  RotateCcw,
-  Database,
-  Triangle,
   Sparkles,
+  LogOut,
+  ShieldCheck,
+  KeyRound,
 } from 'lucide-react';
 
 interface AdminBarProps {
   onNewPost: () => void;
   onEditProfile: () => void;
   onSiteSettings: () => void;
-  onClearToEmpty: () => void;
-  onLoadDemoData: () => void;
   onExportData: () => void;
   onImportData: (jsonStr: string) => void;
-  isSupabaseConnected: boolean;
-  onOpenSupabase: () => void;
-  onOpenVercelDeploy: () => void;
+  onLogout: () => void;
+  onChangePasscode: () => void;
 }
 
 export const AdminBar: React.FC<AdminBarProps> = ({
   onNewPost,
   onEditProfile,
   onSiteSettings,
-  onClearToEmpty,
-  onLoadDemoData,
   onExportData,
   onImportData,
-  isSupabaseConnected,
-  onOpenSupabase,
-  onOpenVercelDeploy,
+  onLogout,
+  onChangePasscode,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -56,18 +49,19 @@ export const AdminBar: React.FC<AdminBarProps> = ({
   return (
     <div className="bg-gray-950 text-white text-xs border-b border-gray-800 shadow-lg sticky top-0 z-40 font-roboto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex flex-wrap items-center justify-between gap-3">
-        {/* Left: Toolbar Label */}
+        {/* Left: Toolbar Label with Admin Status Badge */}
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 font-bold text-white bg-[#00acc1] px-2.5 py-1 rounded text-[11px] uppercase tracking-wide shadow-xs">
             <Sparkles size={13} />
-            <span>Blog Controls</span>
+            <span>Admin Controls</span>
           </div>
-          <span className="text-[11px] text-gray-400 hidden md:inline">
-            Editable Website & Deployment Tools
-          </span>
+          <div className="hidden sm:flex items-center gap-1 text-[11px] text-emerald-400 font-medium bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Admin Active</span>
+          </div>
         </div>
 
-        {/* Center: Main Creation & Integration Actions */}
+        {/* Center: Admin Edit Actions */}
         <div className="flex flex-wrap items-center gap-2">
           {/* New Post Button */}
           <button
@@ -87,7 +81,7 @@ export const AdminBar: React.FC<AdminBarProps> = ({
             <span>Edit Profile</span>
           </button>
 
-          {/* Site Settings Button */}
+          {/* Site Title Button */}
           <button
             onClick={onSiteSettings}
             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 font-medium rounded text-xs transition border border-gray-700 cursor-pointer"
@@ -95,48 +89,25 @@ export const AdminBar: React.FC<AdminBarProps> = ({
             <Settings size={13} className="text-[#00acc1]" />
             <span>Site Title</span>
           </button>
-
-          {/* Supabase Cloud Connection Button */}
-          <button
-            onClick={onOpenSupabase}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 font-medium rounded text-xs transition border border-gray-700 cursor-pointer"
-            title={isSupabaseConnected ? 'Connected to Supabase PostgreSQL' : 'Click to connect Supabase Cloud Database'}
-          >
-            <Database size={13} className="text-emerald-400" />
-            <span>Supabase</span>
-            <span
-              className={`w-2 h-2 rounded-full ${
-                isSupabaseConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
-              }`}
-            />
-          </button>
-
-          {/* Vercel Deploy Guide Button */}
-          <button
-            onClick={onOpenVercelDeploy}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-black hover:bg-gray-800 text-white font-semibold rounded text-xs transition border border-gray-700 cursor-pointer shadow-xs"
-            title="Step-by-step Vercel + Supabase deployment instructions"
-          >
-            <Triangle size={12} className="fill-white" />
-            <span>Deploy</span>
-          </button>
         </div>
 
-        {/* Right: Data Export/Import, Empty Reset, and Demo */}
+        {/* Right: Data Export/Import, Security Passcode, and Logout */}
         <div className="flex items-center gap-2">
+          {/* Backup Button */}
           <button
             onClick={onExportData}
             title="Download blog backup JSON"
-            className="inline-flex items-center gap-1 px-2 py-1 text-gray-300 hover:text-white rounded hover:bg-gray-800 transition cursor-pointer text-[11px]"
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-gray-300 hover:text-white rounded hover:bg-gray-800 transition cursor-pointer text-[11px] border border-gray-800"
           >
             <Download size={13} />
             <span className="hidden sm:inline">Backup</span>
           </button>
 
+          {/* Restore Button */}
           <button
             onClick={() => fileInputRef.current?.click()}
             title="Import/Restore blog data JSON"
-            className="inline-flex items-center gap-1 px-2 py-1 text-gray-300 hover:text-white rounded hover:bg-gray-800 transition cursor-pointer text-[11px]"
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-gray-300 hover:text-white rounded hover:bg-gray-800 transition cursor-pointer text-[11px] border border-gray-800"
           >
             <Upload size={13} />
             <span className="hidden sm:inline">Restore</span>
@@ -149,28 +120,27 @@ export const AdminBar: React.FC<AdminBarProps> = ({
             className="hidden"
           />
 
-          {/* Reset to Empty Button */}
+          {/* Security / Change Passcode Button */}
           <button
-            onClick={onClearToEmpty}
-            title="Clear all details and start fresh with empty fields"
-            className="inline-flex items-center gap-1 text-[11px] text-red-300 hover:text-white bg-red-950/60 hover:bg-red-800 px-2.5 py-1 rounded transition cursor-pointer border border-red-800/60 ml-1"
+            onClick={onChangePasscode}
+            title="Manage security & change admin passcode"
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-gray-300 hover:text-[#00acc1] rounded hover:bg-gray-800 transition cursor-pointer text-[11px] border border-gray-800"
           >
-            <Trash2 size={12} />
-            <span>Empty Details</span>
+            <KeyRound size={12} />
+            <span className="hidden md:inline">Security</span>
           </button>
 
-          {/* Load Demo button */}
+          {/* Logout Button */}
           <button
-            onClick={onLoadDemoData}
-            title="Load original sample demo blog data"
-            className="inline-flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-200 px-2 py-1 rounded transition cursor-pointer ml-0.5 hover:bg-gray-800"
+            onClick={onLogout}
+            title="Lock and exit admin mode"
+            className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-950/70 hover:bg-red-900 text-red-200 hover:text-white rounded transition cursor-pointer text-[11px] border border-red-800/60 font-semibold"
           >
-            <RotateCcw size={11} />
-            <span>Demo</span>
+            <LogOut size={12} />
+            <span>Exit Admin</span>
           </button>
         </div>
       </div>
     </div>
   );
 };
-

@@ -31,11 +31,13 @@ import { ProfileModal } from './components/ProfileModal';
 import { ShareModal } from './components/ShareModal';
 import { ReportAbuseModal } from './components/ReportAbuseModal';
 import { AdminBar } from './components/AdminBar';
+import { AdminLoginModal } from './components/AdminLoginModal';
 import { PostEditorModal } from './components/PostEditorModal';
 import { ProfileEditorModal } from './components/ProfileEditorModal';
 import { SiteSettingsModal } from './components/SiteSettingsModal';
 import { SupabaseConnectModal } from './components/SupabaseConnectModal';
 import { VercelDeployModal } from './components/VercelDeployModal';
+import { isSessionValid, endAdminSession } from './utils/security';
 import {
   isSupabaseConfigured,
   fetchSupabasePosts,
@@ -47,7 +49,7 @@ import {
   upsertSupabaseSettings,
   addSupabaseComment,
 } from './lib/supabase';
-import { X, Search, AlertCircle, Sparkles, Plus, User, Settings, Trash2 } from 'lucide-react';
+import { X, Search, AlertCircle, Sparkles, Plus, User, Settings, Trash2, Lock } from 'lucide-react';
 
 const STORAGE_KEY_POSTS = 'sulekh_blog_posts_v2';
 const STORAGE_KEY_AUTHOR = 'sulekh_blog_author_v2';
@@ -86,15 +88,21 @@ export default function App() {
     return BLOG_POSTS;
   });
 
-  // 2. Author Profile state with localStorage persistence
+  // 2. Author Profile state with localStorage persistence (empty by default so admin fills their own)
   const [profile, setProfile] = useState<AuthorProfile>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_AUTHOR);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Only retain if it's a custom filled profile, not the default Sulekh Kumar
+        if (parsed && parsed.name && parsed.name !== 'Prof. Sulekh Kumar') {
+          return parsed;
+        }
+      }
     } catch {
       // fallback
     }
-    return AUTHOR_PROFILE;
+    return EMPTY_AUTHOR_PROFILE;
   });
 
   // 3. Site Settings state (Title, Tagline, Banner)
@@ -125,15 +133,33 @@ export default function App() {
   const [selectedArchive, setSelectedArchive] = useState('');
   const [visibleCount, setVisibleCount] = useState(POSTS_PER_PAGE);
 
-  // Direct Edit Mode (Enabled for blog customization, posts, and cloud tools)
-  const isEditMode = true;
+  // Heavy Admin Security Authentication State (Only authenticated admin can edit)
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => isSessionValid());
+  const [isAdminLoginOpen, setIsAdminLoginOpen] = useState(false);
+  const isEditMode = isAdmin;
+
+  // Global Keyboard Shortcut: Ctrl + Shift + A or Cmd + Shift + A to open Admin Sign In
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        setIsAdminLoginOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleLogout = () => {
+    endAdminSession();
+    setIsAdmin(false);
+  };
 
   const [isPostEditorOpen, setIsPostEditorOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
   const [isProfileEditorOpen, setIsProfileEditorOpen] = useState(false);
   const [isSiteSettingsOpen, setIsSiteSettingsOpen] = useState(false);
   const [postToDelete, setPostToDelete] = useState<BlogPost | null>(null);
-  const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
   const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
   const [isVercelModalOpen, setIsVercelModalOpen] = useState(false);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(() => isSupabaseConfigured());
@@ -244,31 +270,61 @@ export default function App() {
 
   // Post Actions
   const handleOpenNewPost = () => {
+    if (!isAdmin) {
+      setIsAdminLoginOpen(true);
+      return;
+    }
     setEditingPost(null);
     setIsPostEditorOpen(true);
   };
 
   const handleOpenEditPost = (post: BlogPost) => {
+    if (!isAdmin) {
+      setIsAdminLoginOpen(true);
+      return;
+    }
     setEditingPost(post);
     setIsPostEditorOpen(true);
   };
 
-  const handleSavePost = (data: { id?: string; title: string; content: string; date: string }) => {
+  const handleSavePost = (data: {
+    id?: string;
+    title: string;
+    content: string;
+    date: string;
+    coverImage?: string;
+    coverVideo?: string;
+  }) => {
+    if (!isAdmin) {
+      alert('Access Denied: Only authenticated admin can create or edit posts.');
+      return;
+    }
+
     if (data.id) {
       // Update existing post
-      setPosts((prev) => updateBlogPost(prev, data.id!, {
-        title: data.title,
-        content: data.content,
-        published: data.date ? new Date(data.date).toISOString() : undefined,
-      }));
-      // If we are currently viewing this post, update selectedPost
-      if (selectedPost && selectedPost.id === data.id) {
-        setSelectedPost((prev) => prev ? {
-          ...prev,
+      setPosts((prev) =>
+        updateBlogPost(prev, data.id!, {
           title: data.title,
           content: data.content,
-          published: data.date ? new Date(data.date).toISOString() : prev.published,
-        } : null);
+          published: data.date ? new Date(data.date).toISOString() : undefined,
+          coverImage: data.coverImage,
+          coverVideo: data.coverVideo,
+        })
+      );
+      // If we are currently viewing this post, update selectedPost
+      if (selectedPost && selectedPost.id === data.id) {
+        setSelectedPost((prev) =>
+          prev
+            ? {
+                ...prev,
+                title: data.title,
+                content: data.content,
+                published: data.date ? new Date(data.date).toISOString() : prev.published,
+                coverImage: data.coverImage,
+                coverVideo: data.coverVideo,
+              }
+            : null
+        );
       }
 
       if (isSupabaseConnected) {
@@ -279,13 +335,21 @@ export default function App() {
             title: data.title,
             content: data.content,
             published: data.date ? new Date(data.date).toISOString() : target.published,
+            coverImage: data.coverImage,
+            coverVideo: data.coverVideo,
           });
         }
       }
     } else {
       // Create new post
       const newPost = createBlogPost(
-        { title: data.title, content: data.content, date: data.date },
+        {
+          title: data.title,
+          content: data.content,
+          date: data.date,
+          coverImage: data.coverImage,
+          coverVideo: data.coverVideo,
+        },
         { name: profile.name, title: profile.fullTitle, avatar: profile.avatar }
       );
       setPosts((prev) => [newPost, ...prev]);
@@ -297,6 +361,10 @@ export default function App() {
   };
 
   const confirmDeletePost = () => {
+    if (!isAdmin) {
+      alert('Access Denied: Only authenticated admin can delete posts.');
+      return;
+    }
     if (!postToDelete) return;
     setPosts((prev) => deleteBlogPost(prev, postToDelete.id));
     if (isSupabaseConnected) {
@@ -310,6 +378,10 @@ export default function App() {
 
   // Profile and Settings Actions
   const handleSaveProfile = (newProfile: AuthorProfile) => {
+    if (!isAdmin) {
+      alert('Access Denied: Only authenticated admin can edit profile.');
+      return;
+    }
     setProfile(newProfile);
     if (isSupabaseConnected) {
       upsertSupabaseProfile(newProfile);
@@ -328,27 +400,15 @@ export default function App() {
   };
 
   const handleSaveSiteSettings = (newSettings: SiteSettings) => {
+    if (!isAdmin) {
+      alert('Access Denied: Only authenticated admin can change site title.');
+      return;
+    }
     setSiteSettings(newSettings);
     document.title = newSettings.siteTitle;
     if (isSupabaseConnected) {
       upsertSupabaseSettings(newSettings);
     }
-  };
-
-  // Clear everything to empty details (as requested: reset karne se empty details hona chahiye)
-  const handleClearToEmpty = () => {
-    setIsClearConfirmOpen(true);
-  };
-
-  const executeClearToEmpty = () => {
-    setPosts([]);
-    setProfile(EMPTY_AUTHOR_PROFILE);
-    setSiteSettings(EMPTY_SITE_SETTINGS);
-    setCommentsMap({});
-    setSelectedPost(null);
-    setSelectedArchive('');
-    setSearchQuery('');
-    setIsClearConfirmOpen(false);
   };
 
   // Optional: Restore original demo posts if needed
@@ -437,19 +497,18 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#58c6d5] flex flex-col font-roboto selection:bg-[#00acc1] selection:text-white">
-      {/* Blogger Top Management & Deployment Bar */}
-      <AdminBar
-        onNewPost={handleOpenNewPost}
-        onEditProfile={() => setIsProfileEditorOpen(true)}
-        onSiteSettings={() => setIsSiteSettingsOpen(true)}
-        onClearToEmpty={handleClearToEmpty}
-        onLoadDemoData={handleLoadDemoData}
-        onExportData={handleExportData}
-        onImportData={handleImportData}
-        isSupabaseConnected={isSupabaseConnected}
-        onOpenSupabase={() => setIsSupabaseModalOpen(true)}
-        onOpenVercelDeploy={() => setIsVercelModalOpen(true)}
-      />
+      {/* Blogger Top Management Bar - ONLY VISIBLE TO AUTHENTICATED ADMIN */}
+      {isAdmin && (
+        <AdminBar
+          onNewPost={handleOpenNewPost}
+          onEditProfile={() => setIsProfileEditorOpen(true)}
+          onSiteSettings={() => setIsSiteSettingsOpen(true)}
+          onExportData={handleExportData}
+          onImportData={handleImportData}
+          onLogout={handleLogout}
+          onChangePasscode={() => setIsAdminLoginOpen(true)}
+        />
+      )}
 
       {/* Top Header */}
       <Header
@@ -477,6 +536,7 @@ export default function App() {
             onOpenProfile={() => setIsProfileModalOpen(true)}
             onEditProfile={() => setIsProfileEditorOpen(true)}
             onOpenReportAbuse={() => setIsReportAbuseOpen(true)}
+            onOpenAdminLogin={() => setIsAdminLoginOpen(true)}
             isMobileOpen={isMobileSidebarOpen}
             onCloseMobile={() => setIsMobileSidebarOpen(false)}
             isEditMode={isEditMode}
@@ -643,28 +703,34 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
           <div>
             <p className="font-medium text-sm">
-              {siteSettings.siteTitle}
+              {siteSettings.siteTitle || 'My Blog'}
             </p>
             <p className="text-white/75 text-[11px] mt-0.5">
-              {profile.name} {profile.fullTitle ? `• ${profile.fullTitle.slice(0, 90)}...` : ''}
+              {profile.name ? `${profile.name} ${profile.fullTitle ? `• ${profile.fullTitle.slice(0, 90)}...` : ''}` : 'Personal Blog & Research'}
             </p>
           </div>
           <div className="flex flex-col sm:flex-row items-center gap-4 text-[11px] text-white/80">
             <span>Powered by Blogger • All Rights Reserved</span>
-            <div className="border-t sm:border-t-0 sm:border-l border-white/20 pt-2 sm:pt-0 sm:pl-4 flex items-center gap-3">
-              <button
-                onClick={() => setIsSupabaseModalOpen(true)}
-                className="hover:text-white underline cursor-pointer"
-              >
-                Supabase {isSupabaseConnected ? '(Connected)' : '(Setup)'}
-              </button>
-              <span>•</span>
-              <button
-                onClick={() => setIsVercelModalOpen(true)}
-                className="hover:text-white underline cursor-pointer"
-              >
-                Vercel Deploy
-              </button>
+            <div className="border-t sm:border-t-0 sm:border-l border-white/20 pt-2 sm:pt-0 sm:pl-4 flex items-center gap-2">
+              {!isAdmin ? (
+                <button
+                  onClick={() => setIsAdminLoginOpen(true)}
+                  className="hover:text-white flex items-center gap-1.5 transition cursor-pointer text-white/60 hover:underline"
+                  title="Administrator Sign In"
+                >
+                  <Lock size={12} />
+                  <span>Admin Login</span>
+                </button>
+              ) : (
+                <button
+                  onClick={handleLogout}
+                  className="hover:text-red-300 flex items-center gap-1.5 transition cursor-pointer text-emerald-300 hover:underline"
+                  title="Lock & Exit Admin Mode"
+                >
+                  <Lock size={12} />
+                  <span>Admin Mode (Logout)</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -701,37 +767,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Clear All to Empty Confirmation Modal */}
-      {isClearConfirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-lg shadow-2xl max-w-sm w-full p-6 text-center space-y-4 border border-red-100">
-            <div className="w-14 h-14 rounded-full bg-red-100 text-red-600 mx-auto flex items-center justify-center">
-              <Trash2 size={26} />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-gray-900">Reset to Empty Details?</h3>
-              <p className="text-xs text-gray-600 mt-2 leading-relaxed font-roboto">
-                Kya aap saare demo details empty karna chahte hain? Sabhi posts aur profile details empty ho jayengi taaki aap apna sara details shuru se add kar sakein.
-              </p>
-            </div>
-            <div className="flex items-center justify-center gap-3 pt-2">
-              <button
-                onClick={() => setIsClearConfirmOpen(false)}
-                className="px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={executeClearToEmpty}
-                className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded uppercase tracking-wider cursor-pointer shadow-xs"
-              >
-                Yes, Empty All
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Modals */}
       <PostEditorModal
         isOpen={isPostEditorOpen}
@@ -758,7 +793,7 @@ export default function App() {
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
         profile={profile}
-        onEdit={() => setIsProfileEditorOpen(true)}
+        onEdit={isAdmin ? () => setIsProfileEditorOpen(true) : undefined}
       />
 
       <ShareModal
@@ -786,6 +821,16 @@ export default function App() {
         onOpenSupabaseConnect={() => {
           setIsVercelModalOpen(false);
           setIsSupabaseModalOpen(true);
+        }}
+      />
+
+      {/* Heavy Security Admin Portal Modal */}
+      <AdminLoginModal
+        isOpen={isAdminLoginOpen}
+        onClose={() => setIsAdminLoginOpen(false)}
+        onLoginSuccess={() => {
+          setIsAdmin(true);
+          setIsAdminLoginOpen(false);
         }}
       />
     </div>

@@ -13,6 +13,8 @@ export interface BlogPost {
   updated: string;
   content: string;
   snippet: string;
+  coverImage?: string;
+  coverVideo?: string;
   author: {
     name: string;
     title: string;

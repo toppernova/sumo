@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Share2, ArrowLeft, Send, User, Edit2, Trash2 } from 'lucide-react';
 import { BlogPost, Comment } from '../data/blogData';
-import { formatDate } from '../utils/blogUtils';
+import { formatDate, extractYouTubeId } from '../utils/blogUtils';
 
 interface SinglePostViewProps {
   post: BlogPost;
@@ -113,9 +113,37 @@ export const SinglePostView: React.FC<SinglePostViewProps> = ({
           </h1>
         )}
 
+        {/* Featured Cover Photo */}
+        {post.coverImage && (
+          <div className="my-5 overflow-hidden rounded-md border border-gray-200 shadow-xs max-h-[520px] flex items-center justify-center bg-gray-50">
+            <img
+              src={post.coverImage}
+              alt={post.title || 'Featured Blog Media'}
+              className="w-full h-auto max-h-[520px] object-contain rounded-md"
+            />
+          </div>
+        )}
+
+        {/* Featured Cover Video */}
+        {post.coverVideo && (
+          <div className="my-5 aspect-video w-full max-w-3xl mx-auto overflow-hidden rounded-md shadow-sm border border-gray-200 bg-black">
+            {extractYouTubeId(post.coverVideo) ? (
+              <iframe
+                className="w-full h-full"
+                src={`https://www.youtube.com/embed/${extractYouTubeId(post.coverVideo)}`}
+                title={post.title || 'Video player'}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            ) : (
+              <video controls className="w-full h-full rounded-md" src={post.coverVideo} />
+            )}
+          </div>
+        )}
+
         {/* Full Post Content */}
         <div
-          className="text-[#555] font-roboto text-[15px] sm:text-base leading-relaxed my-6 space-y-4 prose max-w-none [&_p]:mb-4 [&_p]:leading-relaxed [&_blockquote]:border-l-4 [&_blockquote]:border-[#00acc1] [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-gray-600 [&_blockquote]:bg-gray-50/70 [&_blockquote]:py-2 [&_blockquote]:my-3"
+          className="text-[#555] font-roboto text-[15px] sm:text-base leading-relaxed my-6 space-y-4 prose max-w-none [&_p]:mb-4 [&_p]:leading-relaxed [&_blockquote]:border-l-4 [&_blockquote]:border-[#00acc1] [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-gray-600 [&_blockquote]:bg-gray-50/70 [&_blockquote]:py-2 [&_blockquote]:my-3 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-md [&_img]:mx-auto [&_img]:my-4 [&_img]:shadow-xs [&_iframe]:w-full [&_iframe]:aspect-video [&_iframe]:rounded-md [&_iframe]:my-4 [&_video]:w-full [&_video]:rounded-md [&_video]:my-4 [&_figure]:my-4 [&_figcaption]:text-xs [&_figcaption]:text-center [&_figcaption]:text-gray-500 [&_figcaption]:mt-1"
           dangerouslySetInnerHTML={{ __html: post.content }}
         />
 

@@ -81,6 +81,29 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           </div>
 
           <div className="mt-5 space-y-4 text-sm text-gray-700">
+            {!profile.name && !profile.bio && !profile.currentRole && (!profile.education || profile.education.length === 0) && (
+              <div className="p-5 bg-teal-50/70 border border-teal-100 rounded-lg text-center space-y-3 my-2">
+                <p className="text-sm font-semibold text-gray-800">
+                  Profile is currently blank
+                </p>
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  Admin can enter their own name, upload a photo, and fill in biography, designation, education degrees, and location.
+                </p>
+                {onEdit && (
+                  <button
+                    onClick={() => {
+                      onClose();
+                      onEdit();
+                    }}
+                    className="inline-flex items-center gap-1.5 px-5 py-2 bg-[#00acc1] hover:bg-[#00838f] text-white text-xs font-bold uppercase tracking-wider rounded-md transition shadow-xs cursor-pointer"
+                  >
+                    <Edit2 size={13} />
+                    <span>Enter My Profile Details</span>
+                  </button>
+                )}
+              </div>
+            )}
+
             {profile.currentRole && (
               <div className="flex items-start gap-2.5">
                 <Briefcase className="w-5 h-5 text-[#00acc1] shrink-0 mt-0.5" />

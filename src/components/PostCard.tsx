@@ -78,6 +78,40 @@ export const PostCard: React.FC<PostCardProps> = ({
         </h2>
       )}
 
+      {/* Featured Cover Photo if present */}
+      {post.coverImage && (
+        <div
+          onClick={() => onReadMore(post)}
+          className="my-3 overflow-hidden rounded-sm cursor-pointer max-h-80 bg-gray-50 flex items-center justify-center border border-gray-100 group-hover:border-[#00acc1]/30 transition"
+        >
+          <img
+            src={post.coverImage}
+            alt={post.title || 'Blog Post Media'}
+            className="w-full h-full object-cover max-h-80 hover:scale-[1.01] transition-transform duration-300"
+            loading="lazy"
+          />
+        </div>
+      )}
+
+      {/* Featured Cover Video if present */}
+      {post.coverVideo && !post.coverImage && (
+        <div className="my-3 overflow-hidden rounded-sm aspect-video bg-black/5 border border-gray-100">
+          {post.coverVideo.includes('youtu') ? (
+            <iframe
+              className="w-full h-full rounded-sm"
+              src={`https://www.youtube.com/embed/${
+                post.coverVideo.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|shorts\/)([^#&?]*).*/)?.[2] || ''
+              }`}
+              title={post.title || 'Post video'}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          ) : (
+            <video controls className="w-full h-full object-cover rounded-sm" src={post.coverVideo} />
+          )}
+        </div>
+      )}
+
       {/* Post Excerpt Snippet */}
       <div
         onClick={() => onReadMore(post)}

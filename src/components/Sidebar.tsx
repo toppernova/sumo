@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, X, Filter, Edit2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, X, Filter, Edit2, Lock } from 'lucide-react';
 import { AuthorProfile, BlogPost } from '../data/blogData';
 import { getArchiveGroups, ArchiveGroup } from '../utils/blogUtils';
 
@@ -11,6 +11,7 @@ interface SidebarProps {
   onOpenProfile: () => void;
   onEditProfile: () => void;
   onOpenReportAbuse: () => void;
+  onOpenAdminLogin: () => void;
   isMobileOpen: boolean;
   onCloseMobile: () => void;
   isEditMode: boolean;
@@ -24,6 +25,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenProfile,
   onEditProfile,
   onOpenReportAbuse,
+  onOpenAdminLogin,
   isMobileOpen,
   onCloseMobile,
   isEditMode,
@@ -38,7 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <div className="flex flex-col space-y-6 text-[#757575] font-roboto relative">
       {/* Profile Widget */}
       <div className="flex flex-col items-center text-center relative group">
-        {/* Quick Edit Profile Button */}
+        {/* Quick Edit Profile Button - Only visible in Admin Mode */}
         {isEditMode && (
           <button
             onClick={onEditProfile}
@@ -51,8 +53,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Circular Avatar */}
         <div
-          onClick={onOpenProfile}
-          className="w-28 h-28 rounded-full overflow-hidden shadow-sm border border-gray-100 bg-gray-100 mb-4 cursor-pointer hover:opacity-90 transition flex items-center justify-center"
+          onClick={isEditMode ? (profile.name ? onOpenProfile : onEditProfile) : onOpenProfile}
+          className="w-28 h-28 rounded-full overflow-hidden shadow-sm border-2 border-[#00acc1]/20 bg-gray-50 mb-4 cursor-pointer hover:opacity-90 hover:border-[#00acc1] transition flex items-center justify-center group/avatar"
         >
           {profile.avatar ? (
             <img
@@ -64,17 +66,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }}
             />
           ) : (
-            <div className="flex flex-col items-center justify-center text-gray-400 p-2">
+            <div className="flex flex-col items-center justify-center text-gray-400 p-2 text-center">
               <span className="text-3xl font-light">👤</span>
-              <span className="text-[10px] text-gray-500 mt-1">Add Photo</span>
+              {isEditMode && (
+                <span className="text-[10px] text-[#00acc1] font-semibold mt-1 group-hover/avatar:underline">
+                  Add Photo
+                </span>
+              )}
             </div>
           )}
         </div>
 
         {/* Author Name */}
-        <h2 className="text-sm font-bold text-[#212121] uppercase tracking-wide leading-snug px-1">
+        <h2
+          onClick={isEditMode ? (profile.name ? onOpenProfile : onEditProfile) : onOpenProfile}
+          className="text-sm font-bold text-[#212121] uppercase tracking-wide leading-snug px-1 cursor-pointer hover:text-[#00acc1] transition"
+        >
           {profile.name || (
-            <span className="text-gray-400 italic">Your Name</span>
+            <span className="text-gray-400 italic">{isEditMode ? 'Your Name' : 'Author'}</span>
           )}
         </h2>
         {/* Subtitle / Designation */}
@@ -82,17 +91,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <p className="text-[11px] font-semibold text-[#00acc1] uppercase tracking-wide mt-1 px-1">
             {profile.fullTitle}
           </p>
-        ) : (
-          <p className="text-[11px] text-gray-400 italic mt-0.5 px-1">
+        ) : isEditMode ? (
+          <p
+            onClick={onEditProfile}
+            className="text-[11px] text-gray-400 italic mt-0.5 px-1 cursor-pointer hover:text-[#00acc1]"
+          >
             (Add your title / designation)
           </p>
-        )}
+        ) : null}
 
         {/* Bio paragraph */}
-        <p className="mt-3 text-xs leading-relaxed text-[#757575] px-1 font-light text-justify sm:text-center">
+        <p
+          onClick={isEditMode && !profile.bio ? onEditProfile : undefined}
+          className={`mt-3 text-xs leading-relaxed text-[#757575] px-1 font-light text-justify sm:text-center ${
+            isEditMode && !profile.bio ? 'cursor-pointer hover:text-gray-900' : ''
+          }`}
+        >
           {profile.bio || (
             <span className="text-gray-400 italic">
-              Click 'Edit' to enter your bio, education, and district details.
+              {isEditMode
+                ? "Click 'Edit' to enter your bio, education, and district details."
+                : 'Welcome to our blog and research space.'}
             </span>
           )}
         </p>
@@ -198,6 +217,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           Report Abuse
         </button>
+
+        {!isEditMode ? (
+          <button
+            onClick={onOpenAdminLogin}
+            className="text-[11px] text-gray-400 hover:text-[#00acc1] flex items-center gap-1 transition cursor-pointer"
+            title="Administrator Sign-in"
+          >
+            <Lock size={11} />
+            <span>Admin</span>
+          </button>
+        ) : (
+          <span className="text-[10px] text-emerald-600 font-medium flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <span>Admin Mode</span>
+          </span>
+        )}
       </div>
     </div>
   );
@@ -205,13 +240,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <>
       {/* Desktop Sidebar (Left side, fixed width in grid) */}
-      <aside className="hidden lg:block w-72 shrink-0 bg-white/95 backdrop-blur-xs p-6 shadow-xs border-r border-teal-100/50 self-start sticky top-14 rounded-sm">
+      <aside className="hidden lg:block w-72 shrink-0 bg-white/95 backdrop-blur-xs p-6 shadow-xs border-r border-teal-100/50 self-start sticky top-14 rounded-sm max-h-[calc(100vh-4.5rem)] overflow-y-auto">
         {sidebarContent}
       </aside>
 
-      {/* Mobile Drawer Overlay */}
+      {/* Drawer Overlay (Opens on ANY screen size when hamburger is clicked) */}
       {isMobileOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden flex">
+        <div className="fixed inset-0 z-50 flex">
           {/* Backdrop */}
           <div
             className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
@@ -219,13 +254,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           />
 
           {/* Drawer panel */}
-          <div className="relative z-10 w-80 max-w-[85vw] bg-white h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between animate-slide-right">
+          <div className="relative z-10 w-80 sm:w-88 max-w-[90vw] bg-white h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between animate-slide-right">
             <div>
-              <div className="flex justify-end mb-2">
+              <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-100">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                  Menu & Profile
+                </span>
                 <button
                   onClick={onCloseMobile}
                   aria-label="Close sidebar menu"
-                  className="p-1 rounded-full text-gray-500 hover:bg-gray-100 transition"
+                  className="p-1.5 rounded-full text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition cursor-pointer"
                 >
                   <X size={20} />
                 </button>

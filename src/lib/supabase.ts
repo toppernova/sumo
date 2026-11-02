@@ -87,6 +87,8 @@ export async function fetchSupabasePosts(): Promise<BlogPost[] | null> {
       updated: row.updated || row.published,
       content: row.content,
       snippet: row.snippet,
+      coverImage: row.cover_image || undefined,
+      coverVideo: row.cover_video || undefined,
       author: {
         name: row.author_name || '',
         title: row.author_title || '',
@@ -113,6 +115,8 @@ export async function upsertSupabasePost(post: BlogPost): Promise<boolean> {
       updated: post.updated,
       content: post.content,
       snippet: post.snippet,
+      cover_image: post.coverImage || null,
+      cover_video: post.coverVideo || null,
       author_name: post.author.name,
       author_title: post.author.title,
       author_avatar: post.author.avatar,

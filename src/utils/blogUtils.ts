@@ -127,9 +127,20 @@ export function getPopularPosts(
     .slice(0, limit);
 }
 
+export function extractYouTubeId(url: string): string | null {
+  if (!url) return null;
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|shorts\/)([^#&?]*).*/;
+  const match = url.match(regExp);
+  return (match && match[2].length === 11) ? match[2] : null;
+}
+
 export function generateSnippet(content: string, maxLen: number = 480): string {
   if (!content) return '';
   const text = content
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
+    .replace(/<video[^>]*>[\s\S]*?<\/video>/gi, '')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/g, ' ')
     .replace(/&quot;/g, '"')
@@ -141,7 +152,13 @@ export function generateSnippet(content: string, maxLen: number = 480): string {
 }
 
 export function createBlogPost(
-  input: { title?: string; content: string; date?: string },
+  input: {
+    title?: string;
+    content: string;
+    date?: string;
+    coverImage?: string;
+    coverVideo?: string;
+  },
   author: { name: string; title: string; avatar: string }
 ): BlogPost {
   const now = input.date ? new Date(input.date) : new Date();
@@ -167,6 +184,8 @@ export function createBlogPost(
     updated: isoDate,
     content: cleanContent,
     snippet: snippet,
+    coverImage: input.coverImage || undefined,
+    coverVideo: input.coverVideo || undefined,
     author: {
       name: author.name,
       title: author.title,
@@ -180,7 +199,13 @@ export function createBlogPost(
 export function updateBlogPost(
   posts: BlogPost[],
   id: string,
-  changes: { title?: string; content?: string; published?: string }
+  changes: {
+    title?: string;
+    content?: string;
+    published?: string;
+    coverImage?: string;
+    coverVideo?: string;
+  }
 ): BlogPost[] {
   return posts.map((p) => {
     if (p.id !== id) return p;
@@ -201,6 +226,8 @@ export function updateBlogPost(
       content: cleanContent,
       snippet: newSnippet,
       published: changes.published || p.published,
+      coverImage: changes.coverImage !== undefined ? changes.coverImage : p.coverImage,
+      coverVideo: changes.coverVideo !== undefined ? changes.coverVideo : p.coverVideo,
       updated: new Date().toISOString(),
     };
   });

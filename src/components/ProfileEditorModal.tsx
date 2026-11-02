@@ -80,9 +80,9 @@ export const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
 
     onSave({
       ...profile,
-      name: name.trim() || 'Author',
+      name: name.trim(),
       fullTitle: fullTitle.trim(),
-      avatar: avatar || '/author-profile.png',
+      avatar: avatar.trim(),
       bio: bio.trim(),
       district: district.trim(),
       currentRole: currentRole.trim(),
@@ -122,15 +122,22 @@ export const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
           <div className="p-6 overflow-y-auto space-y-5 grow">
             {/* Avatar Section */}
             <div className="flex flex-col sm:flex-row items-center gap-5 p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-white shadow-md bg-white shrink-0">
-                <img
-                  src={avatar}
-                  alt="Profile preview"
-                  className="w-full h-full object-cover object-top"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = '/author-profile.png';
-                  }}
-                />
+              <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-white shadow-md bg-white shrink-0 flex items-center justify-center">
+                {avatar ? (
+                  <img
+                    src={avatar}
+                    alt="Profile preview"
+                    className="w-full h-full object-cover object-top"
+                    onError={() => {
+                      setAvatar('');
+                    }}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-gray-400">
+                    <span className="text-3xl font-light">👤</span>
+                    <span className="text-[10px] text-gray-400 mt-1">No Photo</span>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2 grow w-full">
@@ -148,13 +155,15 @@ export const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
                       className="hidden"
                     />
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => setAvatar('/author-profile.png')}
-                    className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-100 rounded transition cursor-pointer"
-                  >
-                    Reset to Default
-                  </button>
+                  {avatar && (
+                    <button
+                      type="button"
+                      onClick={() => setAvatar('')}
+                      className="px-3 py-1.5 text-xs font-medium text-red-600 bg-white border border-gray-300 hover:bg-red-50 rounded transition cursor-pointer"
+                    >
+                      Remove Photo
+                    </button>
+                  )}
                 </div>
                 <input
                   type="text"
