@@ -149,7 +149,7 @@ export const SinglePostView: React.FC<SinglePostViewProps> = ({
 
         {/* Author signature footer */}
         <div className="mt-8 pt-6 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
-          <span>Posted by {post.author.name}</span>
+          <span>Posted by {post.author.name || 'Author'}</span>
           {post.url ? (
             <a
               href={post.url}

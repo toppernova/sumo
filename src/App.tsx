@@ -49,7 +49,7 @@ import {
   upsertSupabaseSettings,
   addSupabaseComment,
 } from './lib/supabase';
-import { X, Search, AlertCircle, Sparkles, Plus, User, Settings, Trash2, Lock } from 'lucide-react';
+import { X, Search, AlertCircle, Sparkles, Plus, User, Settings, Trash2, Lock, CheckCircle2 } from 'lucide-react';
 
 const STORAGE_KEY_POSTS = 'sulekh_blog_posts_v2';
 const STORAGE_KEY_AUTHOR = 'sulekh_blog_author_v2';
@@ -198,6 +198,15 @@ export default function App() {
   const [sharePost, setSharePost] = useState<BlogPost | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
+  // Instant Visual Feedback Toast when changes are updated everywhere
+  const [syncNotification, setSyncNotification] = useState<string | null>(null);
+  const showSyncNotification = (msg: string) => {
+    setSyncNotification(msg);
+    setTimeout(() => {
+      setSyncNotification((current) => (current === msg ? null : current));
+    }, 4500);
+  };
+
   // Sync to localStorage
   useEffect(() => {
     try {
@@ -230,6 +239,48 @@ export default function App() {
       console.error('Failed to save comments', e);
     }
   }, [commentsMap]);
+
+  // Document metadata & Title synchronization across all pages
+  useEffect(() => {
+    if (siteSettings.siteTitle) {
+      document.title = siteSettings.siteTitle;
+      const ogTitle = document.querySelector('meta[property="og:title"]');
+      if (ogTitle) ogTitle.setAttribute('content', siteSettings.siteTitle);
+    }
+    if (siteSettings.tagline) {
+      const desc = document.querySelector('meta[name="description"]');
+      if (desc) desc.setAttribute('content', siteSettings.tagline);
+      const ogDesc = document.querySelector('meta[property="og:description"]');
+      if (ogDesc) ogDesc.setAttribute('content', siteSettings.tagline);
+    }
+  }, [siteSettings]);
+
+  // Multi-tab / Multi-window auto synchronization
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (!e.newValue) return;
+      try {
+        if (e.key === STORAGE_KEY_POSTS) {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed)) setPosts(parsed);
+        } else if (e.key === STORAGE_KEY_AUTHOR) {
+          const parsed = JSON.parse(e.newValue);
+          if (parsed && typeof parsed === 'object') setProfile(parsed);
+        } else if (e.key === STORAGE_KEY_SETTINGS) {
+          const parsed = JSON.parse(e.newValue);
+          if (parsed && typeof parsed === 'object') setSiteSettings(parsed);
+        } else if (e.key === STORAGE_KEY_COMMENTS) {
+          const parsed = JSON.parse(e.newValue);
+          if (parsed && typeof parsed === 'object') setCommentsMap(parsed);
+        }
+      } catch (err) {
+        console.error('Cross-tab sync error:', err);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   // Handle URL query param on mount e.g. ?post=...
   useEffect(() => {
@@ -340,6 +391,7 @@ export default function App() {
           });
         }
       }
+      showSyncNotification('Post updated successfully across all views!');
     } else {
       // Create new post
       const newPost = createBlogPost(
@@ -357,6 +409,7 @@ export default function App() {
       if (isSupabaseConnected) {
         upsertSupabasePost(newPost);
       }
+      showSyncNotification('New post published and live everywhere on the blog!');
     }
   };
 
@@ -374,6 +427,7 @@ export default function App() {
       setSelectedPost(null);
     }
     setPostToDelete(null);
+    showSyncNotification('Post deleted and removed everywhere.');
   };
 
   // Profile and Settings Actions
@@ -386,7 +440,8 @@ export default function App() {
     if (isSupabaseConnected) {
       upsertSupabaseProfile(newProfile);
     }
-    // Also update author info on user's newly written posts
+
+    // Propagate updated author info across all posts
     setPosts((prev) =>
       prev.map((p) => ({
         ...p,
@@ -397,6 +452,24 @@ export default function App() {
         },
       }))
     );
+
+    // Also update selectedPost if user is viewing one right now
+    if (selectedPost) {
+      setSelectedPost((prev) =>
+        prev
+          ? {
+              ...prev,
+              author: {
+                name: newProfile.name,
+                title: newProfile.fullTitle,
+                avatar: newProfile.avatar,
+              },
+            }
+          : null
+      );
+    }
+
+    showSyncNotification('Author profile updated successfully across all sections & posts!');
   };
 
   const handleSaveSiteSettings = (newSettings: SiteSettings) => {
@@ -405,10 +478,10 @@ export default function App() {
       return;
     }
     setSiteSettings(newSettings);
-    document.title = newSettings.siteTitle;
     if (isSupabaseConnected) {
       upsertSupabaseSettings(newSettings);
     }
+    showSyncNotification('Blog title, subtitle & banner updated across the entire site!');
   };
 
   // Optional: Restore original demo posts if needed
@@ -833,6 +906,26 @@ export default function App() {
           setIsAdminLoginOpen(false);
         }}
       />
+
+      {/* Global Sync Confirmation Toast */}
+      {syncNotification && (
+        <div className="fixed bottom-6 right-6 z-50 bg-gray-900 text-white px-4 py-3 rounded-lg shadow-2xl flex items-center gap-3 border border-[#00acc1]/50 animate-fade-in max-w-sm">
+          <div className="w-7 h-7 rounded-full bg-[#00acc1] text-white flex items-center justify-center shrink-0">
+            <CheckCircle2 size={16} />
+          </div>
+          <div className="text-xs grow">
+            <p className="font-bold text-white">Live & Synchronized</p>
+            <p className="text-gray-300 leading-snug">{syncNotification}</p>
+          </div>
+          <button
+            onClick={() => setSyncNotification(null)}
+            className="text-gray-400 hover:text-white p-1 cursor-pointer transition shrink-0"
+            aria-label="Dismiss notification"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
