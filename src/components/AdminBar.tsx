@@ -9,9 +9,12 @@ import {
   LogOut,
   ShieldCheck,
   KeyRound,
+  Database,
 } from 'lucide-react';
 
 interface AdminBarProps {
+  isSupabaseConnected?: boolean;
+  onOpenDatabase?: () => void;
   onNewPost: () => void;
   onEditProfile: () => void;
   onSiteSettings: () => void;
@@ -22,6 +25,8 @@ interface AdminBarProps {
 }
 
 export const AdminBar: React.FC<AdminBarProps> = ({
+  isSupabaseConnected = false,
+  onOpenDatabase,
   onNewPost,
   onEditProfile,
   onSiteSettings,
@@ -89,6 +94,22 @@ export const AdminBar: React.FC<AdminBarProps> = ({
             <Settings size={13} className="text-[#00acc1]" />
             <span>Site Title</span>
           </button>
+
+          {/* Supabase Cloud Database & Sync Button */}
+          {onOpenDatabase && (
+            <button
+              onClick={onOpenDatabase}
+              title="Supabase Cloud Database & Data Sync"
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 font-medium rounded text-xs transition border cursor-pointer ${
+                isSupabaseConnected
+                  ? 'bg-emerald-950/80 border-emerald-700/60 text-emerald-300 hover:bg-emerald-900'
+                  : 'bg-gray-800 border-gray-700 text-amber-300 hover:bg-gray-700'
+              }`}
+            >
+              <Database size={13} className={isSupabaseConnected ? 'text-emerald-400' : 'text-amber-400'} />
+              <span>{isSupabaseConnected ? 'Cloud: Active' : 'Connect Cloud'}</span>
+            </button>
+          )}
         </div>
 
         {/* Right: Data Export/Import, Security Passcode, and Logout */}

@@ -48,6 +48,9 @@ import {
   upsertSupabaseProfile,
   upsertSupabaseSettings,
   addSupabaseComment,
+  getAdminSession,
+  signOutAdmin,
+  onSupabaseAuthStateChange,
 } from './lib/supabase';
 import { X, Search, AlertCircle, Sparkles, Plus, User, Settings, Trash2, Lock, CheckCircle2 } from 'lucide-react';
 
@@ -58,19 +61,19 @@ const STORAGE_KEY_COMMENTS = 'sulekh_blog_comments_v2';
 const POSTS_PER_PAGE = 6;
 
 const INITIAL_COMMENTS: Record<string, Comment[]> = {
-  '2026-07-15-the-positive-attitude-of-life-2': [
+  '2024-07-15-the-positive-attitude-of-life-2': [
     {
       id: 'c-1',
       author: 'Sunil Mehta',
-      date: 'July 16, 2026',
+      date: 'July 16, 2024',
       content: 'Very inspiring thoughts sir! Truly positive attitude changes circumstances.',
     },
   ],
-  '2026-02-23-emotion-weakness-power-and-stability-3': [
+  '2024-02-23-emotion-weakness-power-and-stability-3': [
     {
       id: 'c-2',
       author: 'Anjali Verma',
-      date: 'February 24, 2026',
+      date: 'February 24, 2024',
       content: 'Managing emotional energy is indeed the true key to mental peace and progress.',
     },
   ],
@@ -138,6 +141,23 @@ export default function App() {
   const [isAdminLoginOpen, setIsAdminLoginOpen] = useState(false);
   const isEditMode = isAdmin;
 
+  // Check Supabase Auth session on mount and listen to changes
+  useEffect(() => {
+    getAdminSession().then((session) => {
+      if (session) {
+        setIsAdmin(true);
+      }
+    });
+
+    const { unsubscribe } = onSupabaseAuthStateChange((_event, session) => {
+      if (session) {
+        setIsAdmin(true);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   // Global Keyboard Shortcut: Ctrl + Shift + A or Cmd + Shift + A to open Admin Sign In
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -150,7 +170,8 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await signOutAdmin();
     endAdminSession();
     setIsAdmin(false);
   };
@@ -573,6 +594,8 @@ export default function App() {
       {/* Blogger Top Management Bar - ONLY VISIBLE TO AUTHENTICATED ADMIN */}
       {isAdmin && (
         <AdminBar
+          isSupabaseConnected={isSupabaseConnected}
+          onOpenDatabase={() => setIsSupabaseModalOpen(true)}
           onNewPost={handleOpenNewPost}
           onEditProfile={() => setIsProfileEditorOpen(true)}
           onSiteSettings={() => setIsSiteSettingsOpen(true)}

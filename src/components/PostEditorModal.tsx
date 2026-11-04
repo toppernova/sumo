@@ -14,9 +14,12 @@ import {
   Trash2,
   CheckCircle2,
   Film,
+  AlertCircle,
 } from 'lucide-react';
 import { BlogPost } from '../data/blogData';
 import { extractYouTubeId } from '../utils/blogUtils';
+import { compressImage, uploadImageToSupabaseStorage } from '../utils/imageUtils';
+import { isSupabaseConfigured } from '../lib/supabase';
 
 interface PostEditorModalProps {
   isOpen: boolean;
@@ -51,6 +54,9 @@ export const PostEditorModal: React.FC<PostEditorModalProps> = ({
   const [photoUrlInput, setPhotoUrlInput] = useState('');
   const [photoCaption, setPhotoCaption] = useState('');
   const [previewPhotoData, setPreviewPhotoData] = useState<string>('');
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [compressionInfo, setCompressionInfo] = useState('');
 
   // Video tool state
   const [showVideoTool, setShowVideoTool] = useState(false);
@@ -87,6 +93,9 @@ export const PostEditorModal: React.FC<PostEditorModalProps> = ({
     setPhotoCaption('');
     setPreviewPhotoData('');
     setVideoUrlInput('');
+    setIsUploadingPhoto(false);
+    setUploadError('');
+    setCompressionInfo('');
   }, [postToEdit, isOpen]);
 
   if (!isOpen) return null;
@@ -123,23 +132,49 @@ export const PostEditorModal: React.FC<PostEditorModalProps> = ({
     }, 50);
   };
 
-  // Handle local image file upload
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle local image file compression & upload to Supabase Storage
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Max 10MB client check
-    if (file.size > 10 * 1024 * 1024) {
-      alert('Please choose an image under 10MB.');
-      return;
-    }
+    // Reset messages
+    setUploadError('');
+    setCompressionInfo('');
+    setIsUploadingPhoto(true);
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      setPreviewPhotoData(result);
-    };
-    reader.readAsDataURL(file);
+    try {
+      // 1. Client-side compression (max 1200px, 82% JPEG quality -> ~100-150KB)
+      const compressed = await compressImage(file, 1200, 1200, 0.82);
+
+      // 2. Check if Supabase is configured
+      if (!isSupabaseConfigured()) {
+        // Fallback: If Supabase is not connected yet, alert user and show settings prompt
+        setUploadError(
+          'Supabase project is not connected yet! Please connect Supabase in Database Settings to store images on cloud CDN, or enter an external image URL below.'
+        );
+        setIsUploadingPhoto(false);
+        return;
+      }
+
+      // 3. Upload to Supabase Storage bucket 'blog-images'
+      setCompressionInfo(
+        `Optimized: ${compressed.originalSizeKb} KB ➔ ${compressed.compressedSizeKb} KB (${compressed.width}x${compressed.height}px). Uploading to cloud...`
+      );
+
+      const publicUrl = await uploadImageToSupabaseStorage(compressed.blob, 'posts');
+      setPreviewPhotoData(publicUrl);
+      setCompressionInfo(
+        `Uploaded to Supabase CDN! (${compressed.originalSizeKb} KB ➔ ${compressed.compressedSizeKb} KB JPEG)`
+      );
+    } catch (err: any) {
+      setUploadError(err?.message || 'Failed to compress or upload image.');
+    } finally {
+      setIsUploadingPhoto(false);
+      // Reset input value so same file can be re-selected if needed
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
   };
 
   // Insert Photo handler
@@ -456,30 +491,56 @@ export const PostEditorModal: React.FC<PostEditorModalProps> = ({
                       </div>
                     </div>
 
+                    {uploadError && (
+                      <div className="p-2.5 bg-red-50 border border-red-200 rounded text-xs text-red-700 flex items-start gap-2">
+                        <AlertCircle size={15} className="text-red-500 shrink-0 mt-0.5" />
+                        <span className="leading-tight">{uploadError}</span>
+                      </div>
+                    )}
+
+                    {compressionInfo && (
+                      <div className="p-2 bg-teal-50 border border-teal-200 rounded text-[11px] text-teal-800 flex items-center gap-1.5 font-medium">
+                        <CheckCircle2 size={13} className="text-[#00acc1]" />
+                        <span>{compressionInfo}</span>
+                      </div>
+                    )}
+
                     {photoSourceType === 'upload' ? (
                       <div>
                         <input
                           type="file"
                           ref={fileInputRef}
                           accept="image/*"
+                          disabled={isUploadingPhoto}
                           onChange={handleImageFileChange}
                           className="hidden"
                         />
                         <button
                           type="button"
+                          disabled={isUploadingPhoto}
                           onClick={() => fileInputRef.current?.click()}
-                          className="w-full py-4 border-2 border-dashed border-teal-300 hover:border-[#00acc1] rounded-md bg-white text-gray-600 flex flex-col items-center justify-center gap-1 text-xs transition cursor-pointer"
+                          className="w-full py-4 border-2 border-dashed border-teal-300 hover:border-[#00acc1] rounded-md bg-white text-gray-600 flex flex-col items-center justify-center gap-1 text-xs transition cursor-pointer disabled:opacity-50"
                         >
-                          <Upload size={20} className="text-[#00acc1]" />
-                          <span className="font-semibold text-gray-700">Click to browse image from device</span>
-                          <span className="text-[10px] text-gray-400">Supports JPG, PNG, WEBP, GIF (Up to 10MB)</span>
+                          {isUploadingPhoto ? (
+                            <div className="flex flex-col items-center gap-1 py-1">
+                              <div className="w-5 h-5 border-2 border-[#00acc1] border-t-transparent rounded-full animate-spin" />
+                              <span className="font-semibold text-[#00acc1]">Compressing & Uploading to Supabase CDN...</span>
+                              <span className="text-[10px] text-gray-400">Resizing to max 1200px • Target ~150KB JPEG</span>
+                            </div>
+                          ) : (
+                            <>
+                              <Upload size={20} className="text-[#00acc1]" />
+                              <span className="font-semibold text-gray-700">Click to browse image from device</span>
+                              <span className="text-[10px] text-gray-400">Auto-compressed to &lt;150KB JPEG & uploaded to Cloud CDN (No Base64)</span>
+                            </>
+                          )}
                         </button>
                       </div>
                     ) : (
                       <div>
                         <input
                           type="url"
-                          placeholder="Paste image link e.g. https://images.unsplash.com/... or Google Image link"
+                          placeholder="Paste image link e.g. https://images.unsplash.com/... or Supabase storage link"
                           value={photoUrlInput}
                           onChange={(e) => setPhotoUrlInput(e.target.value)}
                           className="w-full text-xs px-3 py-2 bg-white border border-gray-300 rounded focus:ring-1 focus:ring-[#00acc1] focus:outline-none"
@@ -495,7 +556,7 @@ export const PostEditorModal: React.FC<PostEditorModalProps> = ({
                           alt="Selected Preview"
                           className="w-16 h-16 object-cover rounded border border-gray-200"
                         />
-                        <div className="grow">
+                        <div className="grow space-y-1">
                           <input
                             type="text"
                             placeholder="Optional photo caption..."
@@ -503,6 +564,9 @@ export const PostEditorModal: React.FC<PostEditorModalProps> = ({
                             onChange={(e) => setPhotoCaption(e.target.value)}
                             className="w-full text-xs px-2.5 py-1.5 border border-gray-200 rounded focus:outline-none"
                           />
+                          <p className="text-[10px] text-gray-400 truncate max-w-sm">
+                            CDN URL: <span className="font-mono">{previewPhotoData || photoUrlInput}</span>
+                          </p>
                         </div>
                       </div>
                     )}
@@ -519,7 +583,7 @@ export const PostEditorModal: React.FC<PostEditorModalProps> = ({
                       <button
                         type="button"
                         onClick={() => handleInsertPhoto(true)}
-                        disabled={!previewPhotoData && !photoUrlInput.trim()}
+                        disabled={isUploadingPhoto || (!previewPhotoData && !photoUrlInput.trim())}
                         className="px-3 py-1 text-xs bg-white text-teal-700 border border-teal-300 hover:bg-teal-50 font-semibold rounded cursor-pointer disabled:opacity-50"
                       >
                         Set as Cover Photo
@@ -527,7 +591,7 @@ export const PostEditorModal: React.FC<PostEditorModalProps> = ({
                       <button
                         type="button"
                         onClick={() => handleInsertPhoto(false)}
-                        disabled={!previewPhotoData && !photoUrlInput.trim()}
+                        disabled={isUploadingPhoto || (!previewPhotoData && !photoUrlInput.trim())}
                         className="px-3 py-1 text-xs bg-[#00acc1] hover:bg-[#00838f] text-white font-bold rounded cursor-pointer disabled:opacity-50 shadow-2xs"
                       >
                         Insert into Content

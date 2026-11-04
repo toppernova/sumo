@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Upload, User, Plus, Trash2 } from 'lucide-react';
+import { X, Save, Upload, User, Plus, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { AuthorProfile } from '../data/blogData';
+import { compressImage, uploadImageToSupabaseStorage } from '../utils/imageUtils';
+import { isSupabaseConfigured } from '../lib/supabase';
 
 interface ProfileEditorModalProps {
   isOpen: boolean;
@@ -23,6 +25,9 @@ export const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
   const [currentRole, setCurrentRole] = useState('');
   const [education, setEducation] = useState<Array<{ degree: string; institution?: string; details?: string }>>([]);
   const [researchInput, setResearchInput] = useState('');
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState('');
+  const [avatarSuccess, setAvatarSuccess] = useState('');
 
   useEffect(() => {
     if (profile) {
@@ -35,20 +40,42 @@ export const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
       setEducation(profile.education ? [...profile.education] : []);
       setResearchInput(profile.researchInterests ? profile.researchInterests.join(', ') : '');
     }
+    setAvatarError('');
+    setAvatarSuccess('');
+    setIsUploadingAvatar(false);
   }, [profile, isOpen]);
 
   if (!isOpen) return null;
 
-  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          setAvatar(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    setAvatarError('');
+    setAvatarSuccess('');
+    setIsUploadingAvatar(true);
+
+    try {
+      // 1. Client-side compression (max 500x500 square for profile avatar, 85% JPEG quality)
+      const compressed = await compressImage(file, 500, 500, 0.85);
+
+      // 2. Check if Supabase is configured
+      if (!isSupabaseConfigured()) {
+        setAvatarError(
+          'Supabase is not connected yet! Please connect Supabase in Database Settings to upload avatar to cloud, or enter an Image URL below.'
+        );
+        setIsUploadingAvatar(false);
+        return;
+      }
+
+      // 3. Upload to Supabase Storage bucket 'blog-images'
+      const publicUrl = await uploadImageToSupabaseStorage(compressed.blob, 'avatars');
+      setAvatar(publicUrl);
+      setAvatarSuccess(`Avatar uploaded to CDN! (${compressed.compressedSizeKb} KB JPEG)`);
+    } catch (err: any) {
+      setAvatarError(err?.message || 'Failed to upload avatar.');
+    } finally {
+      setIsUploadingAvatar(false);
     }
   };
 
@@ -145,12 +172,13 @@ export const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
                   Profile Photo
                 </span>
                 <div className="flex flex-wrap gap-2">
-                  <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#00acc1] hover:bg-[#00838f] text-white text-xs font-semibold rounded cursor-pointer transition">
+                  <label className={`inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#00acc1] hover:bg-[#00838f] text-white text-xs font-semibold rounded cursor-pointer transition ${isUploadingAvatar ? 'opacity-50 pointer-events-none' : ''}`}>
                     <Upload size={14} />
-                    <span>Upload Your Photo</span>
+                    <span>{isUploadingAvatar ? 'Optimizing & Uploading...' : 'Upload Your Photo'}</span>
                     <input
                       type="file"
                       accept="image/*"
+                      disabled={isUploadingAvatar}
                       onChange={handleAvatarFileChange}
                       className="hidden"
                     />
@@ -165,6 +193,21 @@ export const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
                     </button>
                   )}
                 </div>
+
+                {avatarError && (
+                  <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700 flex items-center gap-1.5">
+                    <AlertCircle size={14} className="text-red-500 shrink-0" />
+                    <span>{avatarError}</span>
+                  </div>
+                )}
+
+                {avatarSuccess && (
+                  <div className="p-2 bg-teal-50 border border-teal-200 rounded text-xs text-teal-800 flex items-center gap-1.5 font-medium">
+                    <CheckCircle2 size={14} className="text-[#00acc1] shrink-0" />
+                    <span>{avatarSuccess}</span>
+                  </div>
+                )}
+
                 <input
                   type="text"
                   placeholder="Or enter Image URL (https://...)"

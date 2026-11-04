@@ -1,4 +1,4 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient, Session } from '@supabase/supabase-js';
 import { BlogPost, AuthorProfile, SiteSettings, Comment } from '../data/blogData';
 
 const STORAGE_KEY_CUSTOM_URL = 'sulekh_supabase_custom_url';
@@ -12,30 +12,60 @@ export function getSupabaseCredentials(): { url: string; key: string } {
   const localKey = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY_CUSTOM_KEY) || '' : '';
 
   return {
-    url: envUrl || localUrl,
-    key: envKey || localKey,
+    url: normalizeSupabaseUrl(envUrl || localUrl),
+    key: (envKey || localKey).trim(),
   };
 }
 
-export function saveSupabaseCredentials(url: string, key: string) {
+export function normalizeSupabaseUrl(urlOrId: string): string {
+  let cleaned = (urlOrId || '').trim();
+  if (!cleaned) return '';
+  if (!cleaned.startsWith('http://') && !cleaned.startsWith('https://')) {
+    if (cleaned.includes('.supabase.co')) {
+      cleaned = `https://${cleaned}`;
+    } else {
+      // User entered Project ID / Reference ID
+      cleaned = `https://${cleaned}.supabase.co`;
+    }
+  }
+  return cleaned;
+}
+
+export function saveSupabaseCredentials(urlOrId: string, key: string) {
+  const normalizedUrl = normalizeSupabaseUrl(urlOrId);
   if (typeof window !== 'undefined') {
-    if (url && key) {
-      localStorage.setItem(STORAGE_KEY_CUSTOM_URL, url.trim());
+    if (normalizedUrl && key) {
+      localStorage.setItem(STORAGE_KEY_CUSTOM_URL, normalizedUrl);
       localStorage.setItem(STORAGE_KEY_CUSTOM_KEY, key.trim());
     } else {
       localStorage.removeItem(STORAGE_KEY_CUSTOM_URL);
       localStorage.removeItem(STORAGE_KEY_CUSTOM_KEY);
     }
   }
+  // Clear cached client on credential change
+  cachedClient = null;
+  lastUsedUrl = '';
+  lastUsedKey = '';
 }
 
 let cachedClient: SupabaseClient | null = null;
 let lastUsedUrl = '';
 let lastUsedKey = '';
 
+export function isSupabaseConfigured(): boolean {
+  const { url, key } = getSupabaseCredentials();
+  return Boolean(
+    url &&
+    key &&
+    url.startsWith('https://') &&
+    url.includes('.supabase.co') &&
+    !url.includes('your-project-ref')
+  );
+}
+
 export function getSupabaseClient(): SupabaseClient | null {
   const { url, key } = getSupabaseCredentials();
-  if (!url || !key) return null;
+  if (!isSupabaseConfigured()) return null;
 
   if (cachedClient && lastUsedUrl === url && lastUsedKey === key) {
     return cachedClient;
@@ -43,20 +73,233 @@ export function getSupabaseClient(): SupabaseClient | null {
 
   try {
     cachedClient = createClient(url, key, {
-      auth: { persistSession: false },
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
     });
     lastUsedUrl = url;
     lastUsedKey = key;
     return cachedClient;
   } catch (err) {
-    console.warn('Failed to initialize Supabase client:', err);
+    console.warn('Could not initialize Supabase client:', err);
     return null;
   }
 }
 
-export function isSupabaseConfigured(): boolean {
-  const { url, key } = getSupabaseCredentials();
-  return Boolean(url && key && url.startsWith('http'));
+// -------------------------------------------------------------
+// SUPABASE AUTH OPERATIONS (Admin Only)
+// -------------------------------------------------------------
+
+export async function signInAdmin(email: string, password: string) {
+  const client = getSupabaseClient();
+  if (!client) {
+    throw new Error('Supabase project is not configured. Please enter your Project URL and Anon Key in Database Settings.');
+  }
+
+  const { data, error } = await client.auth.signInWithPassword({
+    email: email.trim(),
+    password: password.trim(),
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function signOutAdmin() {
+  const client = getSupabaseClient();
+  if (!client) return;
+  try {
+    await client.auth.signOut();
+  } catch {
+    // silent catch
+  }
+}
+
+export async function getAdminSession(): Promise<Session | null> {
+  const client = getSupabaseClient();
+  if (!client) return null;
+  try {
+    const { data } = await client.auth.getSession();
+    return data.session;
+  } catch {
+    return null;
+  }
+}
+
+export function onSupabaseAuthStateChange(
+  callback: (event: string, session: Session | null) => void
+) {
+  const client = getSupabaseClient();
+  if (!client) return { unsubscribe: () => {} };
+
+  const { data: authListener } = client.auth.onAuthStateChange((event, session) => {
+    callback(event, session);
+  });
+
+  return {
+    unsubscribe: () => authListener.subscription.unsubscribe(),
+  };
+}
+
+export const SUPABASE_SQL_SCHEMA = `-- ========================================================
+-- SUPABASE POSTGRESQL SCHEMA FOR MOTIVATION BLOG
+-- ========================================================
+
+-- 1. Posts Table
+create table if not exists public.posts (
+  id text primary key,
+  title text default '',
+  published text not null,
+  updated text not null,
+  content text not null,
+  snippet text not null,
+  cover_image text default null,
+  cover_video text default null,
+  is_published boolean default true,
+  author_name text default '',
+  author_title text default '',
+  author_avatar text default '',
+  url text default '',
+  initial_comment_count integer default 0,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Safely add columns if table was created previously without them
+alter table public.posts add column if not exists cover_image text default null;
+alter table public.posts add column if not exists cover_video text default null;
+alter table public.posts add column if not exists is_published boolean default true;
+
+-- 2. Author Profile Table (current_job_role avoids PostgreSQL reserved keyword)
+create table if not exists public.author_profile (
+  id text primary key default 'main_profile',
+  name text default '',
+  full_title text default '',
+  avatar text default '',
+  bio text default '',
+  district text default '',
+  education jsonb default '[]'::jsonb,
+  current_job_role text default '',
+  research_interests jsonb default '[]'::jsonb,
+  blogger_profile_url text default '',
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table public.author_profile add column if not exists current_job_role text default '';
+
+-- 3. Site Settings Table
+create table if not exists public.site_settings (
+  id text primary key default 'main_settings',
+  site_title text default 'Motivation, Education and Research',
+  tagline text default '',
+  header_bg_image text default '/ocean-header.jpg',
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- 4. Comments Table
+create table if not exists public.comments (
+  id text primary key,
+  post_id text references public.posts(id) on delete cascade,
+  author text not null,
+  avatar text default '',
+  date text not null,
+  content text not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- 5. Row Level Security
+alter table public.posts enable row level security;
+alter table public.author_profile enable row level security;
+alter table public.site_settings enable row level security;
+alter table public.comments enable row level security;
+
+-- 6. Access Policies
+drop policy if exists "public_read_posts" on public.posts;
+create policy "public_read_posts" on public.posts for select using (true);
+
+drop policy if exists "public_write_posts" on public.posts;
+create policy "public_write_posts" on public.posts for all using (true);
+
+drop policy if exists "public_profile" on public.author_profile;
+create policy "public_profile" on public.author_profile for all using (true);
+
+drop policy if exists "public_settings" on public.site_settings;
+create policy "public_settings" on public.site_settings for all using (true);
+
+drop policy if exists "public_comments" on public.comments;
+create policy "public_comments" on public.comments for all using (true);
+
+-- 7. Reload Schema Cache
+notify pgrst, 'reload schema';
+`;
+
+// -------------------------------------------------------------
+// CONNECTION TESTER
+// -------------------------------------------------------------
+
+export async function testSupabaseConnection(): Promise<{
+  connected: boolean;
+  tablesFound: boolean;
+  message: string;
+}> {
+  if (!isSupabaseConfigured()) {
+    return {
+      connected: false,
+      tablesFound: false,
+      message: 'Supabase URL or Anon Public Key is missing.',
+    };
+  }
+
+  const client = getSupabaseClient();
+  if (!client) {
+    return {
+      connected: false,
+      tablesFound: false,
+      message: 'Failed to create Supabase client with provided credentials.',
+    };
+  }
+
+  try {
+    const { error } = await client.from('posts').select('id').limit(1);
+    if (error) {
+      const msg = (error.message || '').toLowerCase();
+      if (
+        error.code === '42P01' ||
+        error.code === 'PGRST205' ||
+        msg.includes('relation') ||
+        msg.includes('does not exist') ||
+        msg.includes('schema cache') ||
+        msg.includes('public.posts')
+      ) {
+        return {
+          connected: true,
+          tablesFound: false,
+          message:
+            'Supabase project se connection jud gaya hai! Lekin "posts" table abhi nahi bani hai. Kripya neeche "Copy SQL Script" button dabakar Supabase ke SQL Editor mein paste karke "Run" dabayein.',
+        };
+      }
+      return {
+        connected: false,
+        tablesFound: false,
+        message: `Connection error: ${error.message}`,
+      };
+    }
+    return {
+      connected: true,
+      tablesFound: true,
+      message: 'Supabase se connect ho gaya hai aur database tables verified hain!',
+    };
+  } catch (err: any) {
+    return {
+      connected: false,
+      tablesFound: false,
+      message: `Network error: ${err?.message || 'Could not reach Supabase endpoint.'}`,
+    };
+  }
 }
 
 // -------------------------------------------------------------
@@ -64,6 +307,7 @@ export function isSupabaseConfigured(): boolean {
 // -------------------------------------------------------------
 
 export async function fetchSupabasePosts(): Promise<BlogPost[] | null> {
+  if (!isSupabaseConfigured()) return null;
   const client = getSupabaseClient();
   if (!client) return null;
 
@@ -73,12 +317,7 @@ export async function fetchSupabasePosts(): Promise<BlogPost[] | null> {
       .select('*')
       .order('published', { ascending: false });
 
-    if (error) {
-      console.warn('Supabase fetch posts error:', error.message);
-      return null;
-    }
-
-    if (!data) return [];
+    if (error || !data) return null;
 
     return data.map((row: any) => ({
       id: row.id,
@@ -97,13 +336,13 @@ export async function fetchSupabasePosts(): Promise<BlogPost[] | null> {
       url: row.url || '',
       initialCommentCount: row.initial_comment_count || 0,
     }));
-  } catch (err) {
-    console.warn('Supabase network error fetching posts:', err);
+  } catch {
     return null;
   }
 }
 
 export async function upsertSupabasePost(post: BlogPost): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
   const client = getSupabaseClient();
   if (!client) return false;
 
@@ -122,6 +361,7 @@ export async function upsertSupabasePost(post: BlogPost): Promise<boolean> {
       author_avatar: post.author.avatar,
       url: post.url,
       initial_comment_count: post.initialCommentCount,
+      is_published: true,
     });
 
     return !error;
@@ -131,6 +371,7 @@ export async function upsertSupabasePost(post: BlogPost): Promise<boolean> {
 }
 
 export async function deleteSupabasePost(id: string): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
   const client = getSupabaseClient();
   if (!client) return false;
 
@@ -143,6 +384,7 @@ export async function deleteSupabasePost(id: string): Promise<boolean> {
 }
 
 export async function fetchSupabaseProfile(): Promise<AuthorProfile | null> {
+  if (!isSupabaseConfigured()) return null;
   const client = getSupabaseClient();
   if (!client) return null;
 
@@ -162,7 +404,7 @@ export async function fetchSupabaseProfile(): Promise<AuthorProfile | null> {
       bio: data.bio || '',
       district: data.district || '',
       education: data.education || [],
-      currentRole: data.current_role || '',
+      currentRole: data.current_job_role || data.current_role || '',
       researchInterests: data.research_interests || [],
       bloggerProfileUrl: data.blogger_profile_url || '',
     };
@@ -172,6 +414,7 @@ export async function fetchSupabaseProfile(): Promise<AuthorProfile | null> {
 }
 
 export async function upsertSupabaseProfile(profile: AuthorProfile): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
   const client = getSupabaseClient();
   if (!client) return false;
 
@@ -184,7 +427,7 @@ export async function upsertSupabaseProfile(profile: AuthorProfile): Promise<boo
       bio: profile.bio,
       district: profile.district,
       education: profile.education,
-      current_role: profile.currentRole,
+      current_job_role: profile.currentRole,
       research_interests: profile.researchInterests,
       blogger_profile_url: profile.bloggerProfileUrl,
       updated_at: new Date().toISOString(),
@@ -197,6 +440,7 @@ export async function upsertSupabaseProfile(profile: AuthorProfile): Promise<boo
 }
 
 export async function fetchSupabaseSettings(): Promise<SiteSettings | null> {
+  if (!isSupabaseConfigured()) return null;
   const client = getSupabaseClient();
   if (!client) return null;
 
@@ -220,6 +464,7 @@ export async function fetchSupabaseSettings(): Promise<SiteSettings | null> {
 }
 
 export async function upsertSupabaseSettings(settings: SiteSettings): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
   const client = getSupabaseClient();
   if (!client) return false;
 
@@ -239,6 +484,7 @@ export async function upsertSupabaseSettings(settings: SiteSettings): Promise<bo
 }
 
 export async function fetchSupabaseComments(postId: string): Promise<Comment[] | null> {
+  if (!isSupabaseConfigured()) return null;
   const client = getSupabaseClient();
   if (!client) return null;
 
@@ -264,6 +510,7 @@ export async function fetchSupabaseComments(postId: string): Promise<Comment[] |
 }
 
 export async function addSupabaseComment(postId: string, comment: Comment): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
   const client = getSupabaseClient();
   if (!client) return false;
 
@@ -283,15 +530,21 @@ export async function addSupabaseComment(postId: string, comment: Comment): Prom
   }
 }
 
-// Migrate all local posts and profile into Supabase in 1 click
+// -------------------------------------------------------------
+// ONE-CLICK LOCAL TO CLOUD MIGRATION
+// -------------------------------------------------------------
+
 export async function syncLocalDataToSupabase(
   posts: BlogPost[],
   profile: AuthorProfile,
   settings: SiteSettings
 ): Promise<{ success: boolean; count: number; error?: string }> {
+  if (!isSupabaseConfigured()) {
+    return { success: false, count: 0, error: 'Supabase credentials not configured.' };
+  }
   const client = getSupabaseClient();
   if (!client) {
-    return { success: false, count: 0, error: 'Supabase credentials not set.' };
+    return { success: false, count: 0, error: 'Supabase client failed to initialize.' };
   }
 
   try {

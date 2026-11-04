@@ -17,6 +17,7 @@ import {
   isSupabaseConfigured,
   getSupabaseClient,
   syncLocalDataToSupabase,
+  SUPABASE_SQL_SCHEMA,
 } from '../lib/supabase';
 import { BlogPost, AuthorProfile, SiteSettings } from '../data/blogData';
 
@@ -126,66 +127,7 @@ export const SupabaseConnectModal: React.FC<SupabaseConnectModalProps> = ({
   };
 
   const handleCopySql = () => {
-    const sqlText = `-- Supabase Schema for Blogger
-create table if not exists public.posts (
-  id text primary key,
-  title text default '',
-  published text not null,
-  updated text not null,
-  content text not null,
-  snippet text not null,
-  author_name text default '',
-  author_title text default '',
-  author_avatar text default '',
-  url text default '',
-  initial_comment_count integer default 0,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-
-create table if not exists public.author_profile (
-  id text primary key default 'main_profile',
-  name text default '',
-  full_title text default '',
-  avatar text default '',
-  bio text default '',
-  district text default '',
-  education jsonb default '[]'::jsonb,
-  current_role text default '',
-  research_interests jsonb default '[]'::jsonb,
-  blogger_profile_url text default '',
-  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-
-create table if not exists public.site_settings (
-  id text primary key default 'main_settings',
-  site_title text default 'Motivation, Education and Research',
-  tagline text default '',
-  header_bg_image text default '/ocean-header.jpg',
-  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-
-create table if not exists public.comments (
-  id text primary key,
-  post_id text references public.posts(id) on delete cascade,
-  author text not null,
-  avatar text default '',
-  date text not null,
-  content text not null,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-
-alter table public.posts enable row level security;
-alter table public.author_profile enable row level security;
-alter table public.site_settings enable row level security;
-alter table public.comments enable row level security;
-
-create policy "public_read_posts" on public.posts for select using (true);
-create policy "public_write_posts" on public.posts for all using (true);
-create policy "public_profile" on public.author_profile for all using (true);
-create policy "public_settings" on public.site_settings for all using (true);
-create policy "public_comments" on public.comments for all using (true);
-`;
-    navigator.clipboard.writeText(sqlText);
+    navigator.clipboard.writeText(SUPABASE_SQL_SCHEMA);
     setCopiedSql(true);
     setTimeout(() => setCopiedSql(false), 2500);
   };
