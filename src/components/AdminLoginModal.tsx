@@ -7,24 +7,19 @@ import {
   Eye,
   EyeOff,
   CheckCircle2,
-  Database,
-  RefreshCw,
   KeyRound,
-  ExternalLink,
-  Copy,
-  Check,
+  Mail,
 } from 'lucide-react';
 import {
   signInAdmin,
   isSupabaseConfigured,
-  getSupabaseCredentials,
-  saveSupabaseCredentials,
-  testSupabaseConnection,
-  SUPABASE_SQL_SCHEMA,
 } from '../lib/supabase';
 import {
   verifyPasscode,
   startAdminSession,
+  recordFailedAttempt,
+  checkLockout,
+  resetFailedAttempts,
 } from '../utils/security';
 
 interface AdminLoginModalProps {
@@ -38,99 +33,124 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
   onClose,
   onLoginSuccess,
 }) => {
-  const [activeTab, setActiveTab] = useState<'login' | 'database'>('login');
+  // Login Mode: 'passcode' (Admin Password) or 'supabase_auth' (Email & Password)
+  const [authMode, setAuthMode] = useState<'passcode' | 'supabase_auth'>('passcode');
+
+  // Admin Password
+  const [passwordInput, setPasswordInput] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   // Supabase Auth Email + Password
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-
-  // Database Connection Settings state
-  const [supabaseUrl, setSupabaseUrl] = useState('');
-  const [supabaseAnonKey, setSupabaseAnonKey] = useState('');
-  const [isTestingConn, setIsTestingConn] = useState(false);
-  const [testResult, setTestResult] = useState<{
-    connected: boolean;
-    tablesFound: boolean;
-    message: string;
-  } | null>(null);
-
-  // Fallback passcode state if Supabase is not configured yet
-  const [useFallbackPasscode, setUseFallbackPasscode] = useState(false);
-  const [fallbackPasscode, setFallbackPasscode] = useState('');
+  const [supabasePassword, setSupabasePassword] = useState('');
+  const [showSupabasePassword, setShowSupabasePassword] = useState(false);
 
   // Status feedback
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [copiedSql, setCopiedSql] = useState(false);
-
-  const handleCopySql = () => {
-    navigator.clipboard.writeText(SUPABASE_SQL_SCHEMA);
-    setCopiedSql(true);
-    setTimeout(() => setCopiedSql(false), 2500);
-  };
+  const [lockoutSec, setLockoutSec] = useState(0);
 
   useEffect(() => {
     if (!isOpen) return;
-    const creds = getSupabaseCredentials();
-    setSupabaseUrl(creds.url);
-    setSupabaseAnonKey(creds.key);
+    setPasswordInput('');
+    setEmail('');
+    setSupabasePassword('');
     setError('');
     setSuccessMsg('');
-    setTestResult(null);
     setIsSubmitting(false);
 
-    // If Supabase is not configured yet, notify user
-    if (!isSupabaseConfigured()) {
-      setUseFallbackPasscode(true);
+    const lockout = checkLockout();
+    if (lockout.isLocked) {
+      setLockoutSec(lockout.remainingSeconds);
+      setError(`Too many failed attempts. Locked for ${lockout.remainingSeconds}s.`);
     } else {
-      setUseFallbackPasscode(false);
+      setLockoutSec(0);
     }
   }, [isOpen]);
 
+  // Lockout countdown timer
+  useEffect(() => {
+    if (lockoutSec <= 0) return;
+    const timer = setInterval(() => {
+      setLockoutSec((prev) => {
+        if (prev <= 1) {
+          setError('');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [lockoutSec]);
+
   if (!isOpen) return null;
 
-  // Supabase Auth Login Handler
-  const handleSupabaseLogin = async (e: React.FormEvent) => {
+  // Handle Local / Custom Admin Password Sign-In
+  const handlePasscodeLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (lockoutSec > 0) return;
+
     setError('');
     setSuccessMsg('');
     setIsSubmitting(true);
 
     try {
-      if (useFallbackPasscode) {
-        // Fallback local verification when Supabase isn't connected yet
-        const isValid = await verifyPasscode(fallbackPasscode.trim());
-        if (isValid) {
-          startAdminSession();
+      const isValid = await verifyPasscode(passwordInput.trim());
+      if (isValid) {
+        resetFailedAttempts();
+        startAdminSession();
+        setSuccessMsg('Authentication successful! Welcome, Admin.');
+        setTimeout(() => {
           onLoginSuccess();
           onClose();
+        }, 500);
+      } else {
+        const result = recordFailedAttempt();
+        if (result.isLocked) {
+          setLockoutSec(result.remainingSeconds);
+          setError(`Incorrect password! Security lockout activated for ${result.remainingSeconds}s.`);
         } else {
-          setError('Incorrect passcode. Default passcode is: admin123');
+          setError(`Incorrect password. Please try again. (${result.attemptsLeft} attempts remaining)`);
         }
-        return;
       }
+    } catch {
+      setError('An error occurred during authentication. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
+  // Handle Supabase Email & Password Sign-In
+  const handleSupabaseLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (lockoutSec > 0) return;
+
+    setError('');
+    setSuccessMsg('');
+    setIsSubmitting(true);
+
+    try {
       if (!isSupabaseConfigured()) {
-        setError('Supabase is not configured yet. Please open "Database Settings" below to enter your Supabase URL & Anon Key.');
+        setError('Supabase is not configured yet. Please log in using Admin Password.');
         return;
       }
 
-      const res = await signInAdmin(email.trim(), password.trim());
+      const res = await signInAdmin(email.trim(), supabasePassword.trim());
       if (res && res.session) {
+        resetFailedAttempts();
         startAdminSession();
-        onLoginSuccess();
-        setSuccessMsg('Admin login successful!');
-        setTimeout(() => onClose(), 600);
+        setSuccessMsg('Supabase Admin login successful!');
+        setTimeout(() => {
+          onLoginSuccess();
+          onClose();
+        }, 500);
       }
     } catch (err: any) {
       if (err?.message?.includes('Invalid login credentials')) {
-        setError('Galat Email ya Password! Kripya apna Supabase Admin email aur password check karein.');
+        setError('Galat Email ya Password! Kripya apna sahi email aur password enter karein.');
       } else if (err?.message?.includes('Email not confirmed')) {
-        setError('Email verify nahi hua hai. Supabase Dashboard -> Authentication -> Users me jakar confirm karein.');
-      } else if (err?.message?.includes('Failed to fetch') || err?.message?.includes('NetworkError')) {
-        setError('Supabase backend se connect nahi ho pa raha hai. Internet connection aur Project URL check karein.');
+        setError('Email verify nahi hua hai. Supabase Dashboard -> Authentication -> Users me check karein.');
       } else {
         setError(err?.message || 'Authentication error occurred.');
       }
@@ -139,38 +159,10 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
     }
   };
 
-  // Test and Save Supabase Connection
-  const handleSaveAndTestConnection = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsTestingConn(true);
-    setTestResult(null);
-    setError('');
-
-    try {
-      saveSupabaseCredentials(supabaseUrl.trim(), supabaseAnonKey.trim());
-      const result = await testSupabaseConnection();
-      setTestResult(result);
-      if (result.connected) {
-        setSuccessMsg('Supabase credentials successfully saved & verified!');
-        setUseFallbackPasscode(false);
-      } else {
-        setError(result.message);
-      }
-    } catch (err: any) {
-      setTestResult({
-        connected: false,
-        tablesFound: false,
-        message: err?.message || 'Could not connect to Supabase.',
-      });
-    } finally {
-      setIsTestingConn(false);
-    }
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fade-in font-roboto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fade-in font-roboto">
       <div
-        className="bg-white rounded-lg shadow-2xl max-w-md w-full p-6 relative border border-gray-200"
+        className="bg-white rounded-lg shadow-2xl max-w-sm w-full p-6 relative border border-gray-200"
         role="dialog"
         aria-modal="true"
         aria-labelledby="admin-login-title"
@@ -189,45 +181,11 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
             <Lock size={22} />
           </div>
           <h2 id="admin-login-title" className="text-lg font-bold text-gray-900">
-            Admin Authentication
+            Admin Sign In
           </h2>
           <p className="text-xs text-gray-500 mt-0.5">
-            Supabase Cloud Auth • Only verified admin can edit blog & profile
+            Only authorized administrator can edit blog posts & settings
           </p>
-        </div>
-
-        {/* Tabs: Sign In / Database Setup */}
-        <div className="flex border-b border-gray-200 mb-4">
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab('login');
-              setError('');
-            }}
-            className={`flex-1 py-2 text-xs font-bold text-center border-b-2 transition cursor-pointer flex items-center justify-center gap-1.5 ${
-              activeTab === 'login'
-                ? 'border-[#00acc1] text-[#00acc1]'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <ShieldCheck size={14} />
-            <span>Admin Sign In</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab('database');
-              setError('');
-            }}
-            className={`flex-1 py-2 text-xs font-bold text-center border-b-2 transition cursor-pointer flex items-center justify-center gap-1.5 ${
-              activeTab === 'database'
-                ? 'border-[#00acc1] text-[#00acc1]'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <Database size={14} />
-            <span>Supabase Settings</span>
-          </button>
         </div>
 
         {/* Error Alert */}
@@ -246,236 +204,120 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
           </div>
         )}
 
-        {activeTab === 'login' ? (
-          /* TAB 1: ADMIN LOGIN FORM */
-          <div>
-            {!useFallbackPasscode ? (
-              <form onSubmit={handleSupabaseLogin} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
-                    Admin Email
-                  </label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    placeholder="admin@yourdomain.com"
-                    className="w-full text-xs px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded focus:bg-white focus:ring-2 focus:ring-[#00acc1] focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
-                    Password
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      placeholder="Enter Supabase account password"
-                      className="w-full text-xs px-3.5 py-2.5 pr-10 bg-gray-50 border border-gray-300 rounded focus:bg-white focus:ring-2 focus:ring-[#00acc1] focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
-                    >
-                      {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting || !email.trim() || !password.trim()}
-                  className="w-full py-2.5 bg-[#00acc1] hover:bg-[#00838f] text-white text-xs font-bold uppercase tracking-wider rounded transition cursor-pointer shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  <ShieldCheck size={16} />
-                  <span>{isSubmitting ? 'Verifying with Supabase...' : 'Log In as Admin'}</span>
-                </button>
-
-                <div className="pt-2 text-center space-y-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUseFallbackPasscode(true);
-                      setFallbackPasscode('admin123');
-                      setError('');
-                    }}
-                    className="text-xs text-[#00acc1] hover:underline font-semibold cursor-pointer block mx-auto"
-                  >
-                    🔑 Password bhul gaye? Master passcode (admin123) se login karein
-                  </button>
-                  <p className="text-[10px] text-gray-400">
-                    Supabase user password reset karne ke liye: Supabase Dashboard ➔ Authentication ➔ Users me jakar 3 dots (...) par click karein.
-                  </p>
-                </div>
-              </form>
-            ) : (
-              /* Initial Setup Passcode Fallback */
-              <form onSubmit={handleSupabaseLogin} className="space-y-4">
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800 leading-relaxed">
-                  <strong>Master Setup Passcode:</strong> Agar aap Supabase account password bhul gaye hain ya setup abhi chal raha hai, to default passcode hai: <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono font-bold text-amber-900">admin123</code>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
-                    Setup Passcode
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={fallbackPasscode}
-                      onChange={(e) => setFallbackPasscode(e.target.value)}
-                      placeholder="admin123"
-                      className="w-full text-xs px-3.5 py-2.5 pr-10 bg-gray-50 border border-gray-300 rounded focus:bg-white focus:ring-2 focus:ring-[#00acc1] focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
-                    >
-                      {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting || !fallbackPasscode.trim()}
-                  className="w-full py-2.5 bg-[#00acc1] hover:bg-[#00838f] text-white text-xs font-bold uppercase tracking-wider rounded transition cursor-pointer shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  <KeyRound size={16} />
-                  <span>{isSubmitting ? 'Verifying...' : 'Unlock with Setup Passcode'}</span>
-                </button>
-
-                <div className="pt-2 flex flex-col items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      localStorage.removeItem('blog_admin_sec_hash_v3');
-                      setFallbackPasscode('admin123');
-                      setSuccessMsg('Passcode reset ho gaya hai: admin123');
-                    }}
-                    className="text-[11px] text-gray-500 hover:text-[#00acc1] hover:underline cursor-pointer"
-                  >
-                    Passcode reset karna hai? Default (admin123) karein
-                  </button>
-
-                  {isSupabaseConfigured() && (
-                    <button
-                      type="button"
-                      onClick={() => setUseFallbackPasscode(false)}
-                      className="text-[11px] text-[#00acc1] hover:underline cursor-pointer font-medium"
-                    >
-                      ← Back to Supabase Email & Password Login
-                    </button>
-                  )}
-                </div>
-              </form>
-            )}
-          </div>
-        ) : (
-          /* TAB 2: SUPABASE DATABASE CONFIGURATION & CONNECTION TESTER */
-          <form onSubmit={handleSaveAndTestConnection} className="space-y-3.5">
-            <div className="text-xs text-gray-600 leading-relaxed bg-gray-50 p-2.5 rounded border border-gray-200">
-              <span className="font-bold text-gray-800">Supabase Connection: </span>
-              Apne Supabase project ka <strong>Project URL</strong> aur <strong>anon public key</strong> yahan paste karein. (Service Role key kabhi paste na karein).
-            </div>
-
+        {authMode === 'passcode' ? (
+          /* PRIMARY FORM: ADMIN PASSWORD */
+          <form onSubmit={handlePasscodeLogin} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
-                Supabase Project URL ya Project ID
+                Admin Password
               </label>
-              <input
-                type="text"
-                required
-                value={supabaseUrl}
-                onChange={(e) => setSupabaseUrl(e.target.value)}
-                placeholder="https://xyz.supabase.co ya sirf Project ID (e.g. xyz)"
-                className="w-full text-xs px-3 py-2 bg-gray-50 border border-gray-300 rounded focus:bg-white focus:ring-1 focus:ring-[#00acc1] focus:outline-none"
-              />
-              <span className="text-[10px] text-gray-400 mt-0.5 block">
-                Aap full URL (`https://xyz.supabase.co`) ya sirf apna **Project ID** bhi paste kar sakte hain.
-              </span>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
-                Supabase Anon Public Key (anon public)
-              </label>
-              <textarea
-                rows={3}
-                required
-                value={supabaseAnonKey}
-                onChange={(e) => setSupabaseAnonKey(e.target.value)}
-                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                className="w-full text-xs font-mono px-3 py-2 bg-gray-50 border border-gray-300 rounded focus:bg-white focus:ring-1 focus:ring-[#00acc1] focus:outline-none"
-              />
-              <span className="text-[10px] text-gray-400 mt-0.5 block">
-                Use ONLY the `anon` `public` key. Never expose the `service_role` secret key.
-              </span>
-            </div>
-
-            {testResult && (
-              <div
-                className={`p-2.5 rounded text-xs border ${
-                  testResult.connected && testResult.tablesFound
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                    : testResult.connected && !testResult.tablesFound
-                    ? 'bg-amber-50 border-amber-200 text-amber-800'
-                    : 'bg-red-50 border-red-200 text-red-700'
-                }`}
-              >
-                <div className="flex items-start gap-1.5 font-medium">
-                  {testResult.connected && testResult.tablesFound ? (
-                    <CheckCircle2 size={14} className="shrink-0 text-emerald-600 mt-0.5" />
-                  ) : (
-                    <AlertCircle size={14} className="shrink-0 text-amber-600 mt-0.5" />
-                  )}
-                  <span>{testResult.message}</span>
-                </div>
-              </div>
-            )}
-
-            {/* SQL Copy Card */}
-            <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <p className="text-xs font-bold text-gray-800">
-                    Supabase Database SQL Schema
-                  </p>
-                  <p className="text-[11px] text-gray-500">
-                    Tables (`posts`, `author_profile`, `comments`) banane ke liye script copy karein:
-                  </p>
-                </div>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  disabled={lockoutSec > 0}
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  placeholder="Enter administrator password"
+                  autoFocus
+                  className="w-full text-xs px-3.5 py-2.5 pr-10 bg-gray-50 border border-gray-300 rounded focus:bg-white focus:ring-2 focus:ring-[#00acc1] focus:outline-none disabled:opacity-50"
+                />
                 <button
                   type="button"
-                  onClick={handleCopySql}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-100 text-gray-800 text-xs font-semibold rounded transition cursor-pointer shrink-0 shadow-xs"
+                  tabIndex={-1}
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
                 >
-                  {copiedSql ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-                  <span>{copiedSql ? 'Copied SQL!' : 'Copy SQL'}</span>
+                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
-              </div>
-              <div className="text-[11px] text-gray-500 bg-white p-2 rounded border border-gray-100 leading-normal">
-                <strong>Kaise karein:</strong> Supabase Dashboard kholiye ➔ Left menu se <strong>SQL Editor</strong> par click karein ➔ <strong>New query</strong> me paste karke green <strong>Run</strong> button dabayein.
               </div>
             </div>
 
-            <div className="flex gap-2 pt-1">
+            <button
+              type="submit"
+              disabled={isSubmitting || !passwordInput.trim() || lockoutSec > 0}
+              className="w-full py-2.5 bg-[#00acc1] hover:bg-[#00838f] text-white text-xs font-bold uppercase tracking-wider rounded transition cursor-pointer shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <KeyRound size={16} />
+              <span>{isSubmitting ? 'Verifying...' : 'Unlock Admin Mode'}</span>
+            </button>
+
+            {isSupabaseConfigured() && (
+              <div className="pt-2 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode('supabase_auth');
+                    setError('');
+                  }}
+                  className="text-xs text-gray-500 hover:text-[#00acc1] hover:underline cursor-pointer flex items-center justify-center gap-1 mx-auto"
+                >
+                  <Mail size={13} />
+                  <span>Or sign in with Supabase Email & Password</span>
+                </button>
+              </div>
+            )}
+          </form>
+        ) : (
+          /* SECONDARY FORM: SUPABASE EMAIL & PASSWORD */
+          <form onSubmit={handleSupabaseLogin} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                Admin Email
+              </label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="admin@yourdomain.com"
+                className="w-full text-xs px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded focus:bg-white focus:ring-2 focus:ring-[#00acc1] focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showSupabasePassword ? 'text' : 'password'}
+                  required
+                  value={supabasePassword}
+                  onChange={(e) => setSupabasePassword(e.target.value)}
+                  placeholder="Enter Supabase account password"
+                  className="w-full text-xs px-3.5 py-2.5 pr-10 bg-gray-50 border border-gray-300 rounded focus:bg-white focus:ring-2 focus:ring-[#00acc1] focus:outline-none"
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowSupabasePassword(!showSupabasePassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                >
+                  {showSupabasePassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting || !email.trim() || !supabasePassword.trim() || lockoutSec > 0}
+              className="w-full py-2.5 bg-[#00acc1] hover:bg-[#00838f] text-white text-xs font-bold uppercase tracking-wider rounded transition cursor-pointer shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <ShieldCheck size={16} />
+              <span>{isSubmitting ? 'Verifying...' : 'Sign In with Email'}</span>
+            </button>
+
+            <div className="pt-2 text-center">
               <button
-                type="submit"
-                disabled={isTestingConn || !supabaseUrl.trim() || !supabaseAnonKey.trim()}
-                className="w-full py-2.5 bg-[#00acc1] hover:bg-[#00838f] text-white text-xs font-bold uppercase tracking-wider rounded transition cursor-pointer shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50"
+                type="button"
+                onClick={() => {
+                  setAuthMode('passcode');
+                  setError('');
+                }}
+                className="text-xs text-[#00acc1] hover:underline cursor-pointer font-medium"
               >
-                <RefreshCw size={14} className={isTestingConn ? 'animate-spin' : ''} />
-                <span>{isTestingConn ? 'Testing Connection...' : 'Save & Test Connection'}</span>
+                ← Back to Admin Password Sign In
               </button>
             </div>
           </form>

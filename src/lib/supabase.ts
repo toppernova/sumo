@@ -233,8 +233,57 @@ create policy "public_settings" on public.site_settings for all using (true);
 drop policy if exists "public_comments" on public.comments;
 create policy "public_comments" on public.comments for all using (true);
 
--- 7. Reload Schema Cache
+-- 7. Storage Policies for 'blog-images' Bucket (Fixes: row-level security policy error on photo upload)
+insert into storage.buckets (id, name, public)
+values ('blog-images', 'blog-images', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists "public_read_blog_images" on storage.objects;
+drop policy if exists "public_upload_blog_images" on storage.objects;
+drop policy if exists "public_update_blog_images" on storage.objects;
+
+create policy "public_read_blog_images"
+on storage.objects for select
+to public
+using (bucket_id = 'blog-images');
+
+create policy "public_upload_blog_images"
+on storage.objects for insert
+to public
+with check (bucket_id = 'blog-images');
+
+create policy "public_update_blog_images"
+on storage.objects for update
+to public
+using (bucket_id = 'blog-images');
+
+-- 8. Reload Schema Cache
 notify pgrst, 'reload schema';
+`;
+
+export const SUPABASE_STORAGE_SQL = `-- Fix Storage Upload Error: Run this in Supabase SQL Editor
+insert into storage.buckets (id, name, public)
+values ('blog-images', 'blog-images', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists "public_read_blog_images" on storage.objects;
+drop policy if exists "public_upload_blog_images" on storage.objects;
+drop policy if exists "public_update_blog_images" on storage.objects;
+
+create policy "public_read_blog_images"
+on storage.objects for select
+to public
+using (bucket_id = 'blog-images');
+
+create policy "public_upload_blog_images"
+on storage.objects for insert
+to public
+with check (bucket_id = 'blog-images');
+
+create policy "public_update_blog_images"
+on storage.objects for update
+to public
+using (bucket_id = 'blog-images');
 `;
 
 // -------------------------------------------------------------

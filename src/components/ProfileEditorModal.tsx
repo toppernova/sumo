@@ -69,11 +69,18 @@ export const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
       }
 
       // 3. Upload to Supabase Storage bucket 'blog-images'
-      const publicUrl = await uploadImageToSupabaseStorage(compressed.blob, 'avatars');
-      setAvatar(publicUrl);
-      setAvatarSuccess(`Avatar uploaded to CDN! (${compressed.compressedSizeKb} KB JPEG)`);
+      try {
+        const publicUrl = await uploadImageToSupabaseStorage(compressed.blob, 'avatars');
+        setAvatar(publicUrl);
+        setAvatarSuccess(`Avatar uploaded to CDN! (${compressed.compressedSizeKb} KB JPEG)`);
+      } catch (uploadErr: any) {
+        // Fallback: If cloud RLS is missing, save compressed dataUrl locally so user is not blocked
+        setAvatar(compressed.dataUrl);
+        setAvatarSuccess(`Avatar photo set locally! (${compressed.compressedSizeKb} KB compressed)`);
+        setAvatarError('Cloud upload notice: Supabase Storage Policy run karein agar cloud CDN URL chahiye.');
+      }
     } catch (err: any) {
-      setAvatarError(err?.message || 'Failed to upload avatar.');
+      setAvatarError(err?.message || 'Failed to process avatar image.');
     } finally {
       setIsUploadingAvatar(false);
     }

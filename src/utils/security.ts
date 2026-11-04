@@ -44,6 +44,36 @@ export async function verifyPasscode(input: string): Promise<boolean> {
   return inputHash === storedHash;
 }
 
+export async function changeAdminPasscode(
+  currentPasscode: string,
+  newPasscode: string
+): Promise<{ success: boolean; message: string }> {
+  const isCurrentValid = await verifyPasscode(currentPasscode);
+  if (!isCurrentValid) {
+    return {
+      success: false,
+      message: 'Current password galat hai! Kripya sahi purana password enter karein.',
+    };
+  }
+  if (!newPasscode || newPasscode.trim().length < 6) {
+    return {
+      success: false,
+      message: 'Naya password kam se kam 6 characters ka hona chahiye.',
+    };
+  }
+  const newHash = await hashPasscode(newPasscode.trim());
+  setStoredPasscodeHash(newHash);
+  localStorage.setItem('blog_admin_has_custom_passcode', 'true');
+  return {
+    success: true,
+    message: 'Admin password successfully change ho gaya hai!',
+  };
+}
+
+export function hasCustomPasscodeSet(): boolean {
+  return localStorage.getItem('blog_admin_has_custom_passcode') === 'true';
+}
+
 export function checkLockout(): { isLocked: boolean; remainingSeconds: number } {
   try {
     const lockoutUntilStr = localStorage.getItem(STORAGE_LOCKOUT_KEY);

@@ -15,11 +15,13 @@ import {
   CheckCircle2,
   Film,
   AlertCircle,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { BlogPost } from '../data/blogData';
 import { extractYouTubeId } from '../utils/blogUtils';
 import { compressImage, uploadImageToSupabaseStorage } from '../utils/imageUtils';
-import { isSupabaseConfigured } from '../lib/supabase';
+import { isSupabaseConfigured, SUPABASE_STORAGE_SQL } from '../lib/supabase';
 
 interface PostEditorModalProps {
   isOpen: boolean;
@@ -57,6 +59,14 @@ export const PostEditorModal: React.FC<PostEditorModalProps> = ({
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [compressionInfo, setCompressionInfo] = useState('');
+  const [fallbackDataUrl, setFallbackDataUrl] = useState('');
+  const [copiedStorageSql, setCopiedStorageSql] = useState(false);
+
+  const handleCopyStorageSql = () => {
+    navigator.clipboard.writeText(SUPABASE_STORAGE_SQL);
+    setCopiedStorageSql(true);
+    setTimeout(() => setCopiedStorageSql(false), 2500);
+  };
 
   // Video tool state
   const [showVideoTool, setShowVideoTool] = useState(false);
@@ -145,6 +155,7 @@ export const PostEditorModal: React.FC<PostEditorModalProps> = ({
     try {
       // 1. Client-side compression (max 1200px, 82% JPEG quality -> ~100-150KB)
       const compressed = await compressImage(file, 1200, 1200, 0.82);
+      setFallbackDataUrl(compressed.dataUrl);
 
       // 2. Check if Supabase is configured
       if (!isSupabaseConfigured()) {
@@ -492,9 +503,38 @@ export const PostEditorModal: React.FC<PostEditorModalProps> = ({
                     </div>
 
                     {uploadError && (
-                      <div className="p-2.5 bg-red-50 border border-red-200 rounded text-xs text-red-700 flex items-start gap-2">
-                        <AlertCircle size={15} className="text-red-500 shrink-0 mt-0.5" />
-                        <span className="leading-tight">{uploadError}</span>
+                      <div className="p-3 bg-red-50 border border-red-200 rounded-md text-xs text-red-800 space-y-2">
+                        <div className="flex items-start gap-2">
+                          <AlertCircle size={15} className="text-red-500 shrink-0 mt-0.5" />
+                          <span className="leading-tight font-medium">{uploadError}</span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-red-100">
+                          {/* Fallback option to use compressed photo right away */}
+                          {fallbackDataUrl && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPreviewPhotoData(fallbackDataUrl);
+                                setUploadError('');
+                                setCompressionInfo('Optimized local photo ready to insert!');
+                              }}
+                              className="px-2.5 py-1 bg-[#00acc1] hover:bg-[#00838f] text-white text-xs font-semibold rounded cursor-pointer shadow-2xs"
+                            >
+                              ⚡ Use Compressed Photo Anyway (No Wait)
+                            </button>
+                          )}
+
+                          {/* Copy Storage RLS SQL fix button */}
+                          <button
+                            type="button"
+                            onClick={handleCopyStorageSql}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-gray-300 hover:bg-gray-100 text-gray-800 text-xs font-semibold rounded cursor-pointer shadow-2xs"
+                          >
+                            {copiedStorageSql ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                            <span>{copiedStorageSql ? 'Copied Storage SQL!' : 'Copy Storage SQL Fix'}</span>
+                          </button>
+                        </div>
                       </div>
                     )}
 

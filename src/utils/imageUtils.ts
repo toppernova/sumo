@@ -124,6 +124,11 @@ export async function uploadImageToSupabaseStorage(
         "Supabase Storage bucket 'blog-images' not found. Please create a public bucket named 'blog-images' in your Supabase Dashboard -> Storage."
       );
     }
+    if (error.message?.includes('row-level security') || error.message?.includes('violates')) {
+      throw new Error(
+        "Storage RLS Policy missing: Supabase bucket 'blog-images' par photo upload allow karne ke liye SQL Editor mein Storage Policy run karein."
+      );
+    }
     throw new Error(`Upload failed: ${error.message}`);
   }
 

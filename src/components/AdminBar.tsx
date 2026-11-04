@@ -141,14 +141,14 @@ export const AdminBar: React.FC<AdminBarProps> = ({
             className="hidden"
           />
 
-          {/* Security / Change Passcode Button */}
+          {/* Security / Change Password Button */}
           <button
             onClick={onChangePasscode}
-            title="Manage security & change admin passcode"
+            title="Change admin password"
             className="inline-flex items-center gap-1 px-2.5 py-1 text-gray-300 hover:text-[#00acc1] rounded hover:bg-gray-800 transition cursor-pointer text-[11px] border border-gray-800"
           >
             <KeyRound size={12} />
-            <span className="hidden md:inline">Security</span>
+            <span className="hidden sm:inline">Change Password</span>
           </button>
 
           {/* Logout Button */}

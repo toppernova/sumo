@@ -37,6 +37,7 @@ import { ProfileEditorModal } from './components/ProfileEditorModal';
 import { SiteSettingsModal } from './components/SiteSettingsModal';
 import { SupabaseConnectModal } from './components/SupabaseConnectModal';
 import { VercelDeployModal } from './components/VercelDeployModal';
+import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { isSessionValid, endAdminSession } from './utils/security';
 import {
   isSupabaseConfigured,
@@ -183,6 +184,7 @@ export default function App() {
   const [postToDelete, setPostToDelete] = useState<BlogPost | null>(null);
   const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
   const [isVercelModalOpen, setIsVercelModalOpen] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(() => isSupabaseConfigured());
 
   // Cloud sync handler: loads initial data from Supabase if connected
@@ -602,7 +604,7 @@ export default function App() {
           onExportData={handleExportData}
           onImportData={handleImportData}
           onLogout={handleLogout}
-          onChangePasscode={() => setIsAdminLoginOpen(true)}
+          onChangePasscode={() => setIsChangePasswordOpen(true)}
         />
       )}
 
@@ -928,6 +930,13 @@ export default function App() {
           setIsAdmin(true);
           setIsAdminLoginOpen(false);
         }}
+      />
+
+      {/* Change Admin Password Modal */}
+      <ChangePasswordModal
+        isOpen={isChangePasswordOpen}
+        onClose={() => setIsChangePasswordOpen(false)}
+        onSuccess={(msg) => showSyncNotification(msg)}
       />
 
       {/* Global Sync Confirmation Toast */}
