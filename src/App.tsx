@@ -185,8 +185,8 @@ export default function App() {
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(() => isSupabaseConfigured());
 
-  // Cloud sync handler: loads initial data from Supabase if connected
-  const refreshSupabaseData = async () => {
+  // Cloud sync handler: loads data from Supabase and keeps connection permanently active
+  const refreshSupabaseData = async (retryCount = 0) => {
     const configured = isSupabaseConfigured();
     setIsSupabaseConnected(configured);
     if (!configured) return;
@@ -206,11 +206,38 @@ export default function App() {
       }
     } catch (e) {
       console.warn('Error loading from Supabase:', e);
+      // Auto-retry on cold-start or temporary network latency
+      if (retryCount < 2) {
+        setTimeout(() => refreshSupabaseData(retryCount + 1), 2000);
+      }
     }
   };
 
   useEffect(() => {
     refreshSupabaseData();
+
+    // Auto-reconnect & sync on window focus and when returning online
+    const handleRecheck = () => {
+      if (isSupabaseConfigured()) {
+        setIsSupabaseConnected(true);
+        refreshSupabaseData();
+      }
+    };
+
+    window.addEventListener('online', handleRecheck);
+    window.addEventListener('focus', handleRecheck);
+
+    // Keep connection verified & active continuously every 60 seconds
+    const interval = setInterval(() => {
+      const configured = isSupabaseConfigured();
+      setIsSupabaseConnected(configured);
+    }, 60000);
+
+    return () => {
+      window.removeEventListener('online', handleRecheck);
+      window.removeEventListener('focus', handleRecheck);
+      clearInterval(interval);
+    };
   }, []);
 
   // Viewer Modals & Drawers

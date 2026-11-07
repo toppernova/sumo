@@ -3,10 +3,40 @@ import { BlogPost, AuthorProfile, SiteSettings, Comment } from '../data/blogData
 
 const STORAGE_KEY_CUSTOM_URL = 'sulekh_supabase_custom_url';
 const STORAGE_KEY_CUSTOM_KEY = 'sulekh_supabase_custom_key';
+const STORAGE_KEY_MANUAL_DISCONNECT = 'sulekh_supabase_manual_disconnected';
 
 // Default Supabase project credentials for Motivation & Research Blog
-const DEFAULT_PROJECT_URL = 'https://fwyuvemoesinkpjitjbf.supabase.co';
-const DEFAULT_ANON_KEY = 'sb_publishable_8zoV5fJT4tV7AVz9Dj2luw_4yf_5aQI';
+export const DEFAULT_PROJECT_URL = 'https://fwyuvemoesinkpjitjbf.supabase.co';
+export const DEFAULT_ANON_KEY = 'sb_publishable_8zoV5fJT4tV7AVz9Dj2luw_4yf_5aQI';
+
+export function isManuallyDisconnected(): boolean {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem(STORAGE_KEY_MANUAL_DISCONNECT) === 'true';
+}
+
+export function disconnectSupabase() {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY_MANUAL_DISCONNECT, 'true');
+  }
+  cachedClient = null;
+  lastUsedUrl = '';
+  lastUsedKey = '';
+}
+
+export function reconnectSupabase(customUrl?: string, customKey?: string) {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(STORAGE_KEY_MANUAL_DISCONNECT);
+  }
+  if (customUrl && customKey) {
+    saveSupabaseCredentials(customUrl, customKey);
+  } else {
+    // Re-pin default project credentials
+    saveSupabaseCredentials(DEFAULT_PROJECT_URL, DEFAULT_ANON_KEY);
+  }
+  cachedClient = null;
+  lastUsedUrl = '';
+  lastUsedKey = '';
+}
 
 export function getSupabaseCredentials(): { url: string; key: string } {
   const envUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -15,10 +45,36 @@ export function getSupabaseCredentials(): { url: string; key: string } {
   const localUrl = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY_CUSTOM_URL) || '' : '';
   const localKey = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY_CUSTOM_KEY) || '' : '';
 
+  const finalUrl = normalizeSupabaseUrl(localUrl || envUrl || DEFAULT_PROJECT_URL);
+  const finalKey = (localKey || envKey || DEFAULT_ANON_KEY).trim();
+
+  // Auto-persist in localStorage so browser refreshes, incognito, or tab closures never lose the connection
+  if (typeof window !== 'undefined' && (!localUrl || !localKey) && !isManuallyDisconnected()) {
+    try {
+      localStorage.setItem(STORAGE_KEY_CUSTOM_URL, finalUrl);
+      localStorage.setItem(STORAGE_KEY_CUSTOM_KEY, finalKey);
+    } catch {
+      // storage quota or private browsing
+    }
+  }
+
   return {
-    url: normalizeSupabaseUrl(localUrl || envUrl || DEFAULT_PROJECT_URL),
-    key: (localKey || envKey || DEFAULT_ANON_KEY).trim(),
+    url: finalUrl,
+    key: finalKey,
   };
+}
+
+export function getSupabaseProjectRef(): string {
+  const { url } = getSupabaseCredentials();
+  if (!url) return '';
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname; // e.g. fwyuvemoesinkpjitjbf.supabase.co
+    return host.split('.')[0] || '';
+  } catch {
+    const match = url.match(/https?:\/\/([^.]+)\.supabase\.co/);
+    return match ? match[1] : '';
+  }
 }
 
 export function normalizeSupabaseUrl(urlOrId: string): string {
@@ -41,6 +97,8 @@ export function saveSupabaseCredentials(urlOrId: string, key: string) {
     if (normalizedUrl && key) {
       localStorage.setItem(STORAGE_KEY_CUSTOM_URL, normalizedUrl);
       localStorage.setItem(STORAGE_KEY_CUSTOM_KEY, key.trim());
+      // Reconnecting automatically when saving credentials
+      localStorage.removeItem(STORAGE_KEY_MANUAL_DISCONNECT);
     } else {
       localStorage.removeItem(STORAGE_KEY_CUSTOM_URL);
       localStorage.removeItem(STORAGE_KEY_CUSTOM_KEY);
@@ -57,6 +115,10 @@ let lastUsedUrl = '';
 let lastUsedKey = '';
 
 export function isSupabaseConfigured(): boolean {
+  // If the admin explicitly clicked Disconnect, return false
+  if (isManuallyDisconnected()) {
+    return false;
+  }
   const { url, key } = getSupabaseCredentials();
   return Boolean(
     url &&
@@ -302,6 +364,14 @@ export async function testSupabaseConnection(): Promise<{
   tablesFound: boolean;
   message: string;
 }> {
+  if (isManuallyDisconnected()) {
+    return {
+      connected: false,
+      tablesFound: false,
+      message: 'Supabase cloud is currently disconnected by Admin. Click "Reconnect" to activate.',
+    };
+  }
+
   if (!isSupabaseConfigured()) {
     return {
       connected: false,
@@ -323,13 +393,15 @@ export async function testSupabaseConnection(): Promise<{
     const { error } = await client.from('posts').select('id').limit(1);
     if (error) {
       const msg = (error.message || '').toLowerCase();
+      const code = (error as any).code || '';
       if (
-        error.code === '42P01' ||
-        error.code === 'PGRST205' ||
+        code === '42P01' ||
+        code === 'PGRST205' ||
         msg.includes('relation') ||
         msg.includes('does not exist') ||
         msg.includes('schema cache') ||
-        msg.includes('public.posts')
+        msg.includes('public.posts') ||
+        msg.includes('could not find the table')
       ) {
         return {
           connected: true,
