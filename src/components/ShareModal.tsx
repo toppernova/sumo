@@ -12,9 +12,10 @@ export const ShareModal: React.FC<ShareModalProps> = ({ post, onClose }) => {
 
   if (!post) return null;
 
+  const authorName = post.author?.name?.trim() || '';
   const shareTitle = post.title || 'Motivation, Education and Research';
   const shareUrl = window.location.origin + (post.url ? `?post=${post.id}` : '');
-  const shareText = `${shareTitle} - Blog by Prof. Sulekh Kumar`;
+  const shareText = authorName ? `${shareTitle} - Blog by ${authorName}` : shareTitle;
 
   const handleCopy = async () => {
     try {
@@ -78,7 +79,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ post, onClose }) => {
           <p className="text-sm font-medium text-gray-900 line-clamp-2">
             {post.title || post.snippet.slice(0, 80) + '...'}
           </p>
-          <p className="text-xs text-gray-500 mt-1">By Prof. Sulekh Kumar</p>
+          {authorName && <p className="text-xs text-gray-500 mt-1">By {authorName}</p>}
         </div>
 
         {/* Share buttons */}

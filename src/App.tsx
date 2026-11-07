@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import {
   BLOG_POSTS,
   AUTHOR_PROFILE,
+  EMPTY_AUTHOR_PROFILE,
   DEFAULT_SITE_SETTINGS,
   EMPTY_SITE_SETTINGS,
   BlogPost,
@@ -82,29 +83,47 @@ const INITIAL_COMMENTS: Record<string, Comment[]> = {
 export default function App() {
   // 1. Posts state with localStorage persistence
   const [posts, setPosts] = useState<BlogPost[]>(() => {
+    let rawPosts: BlogPost[] = BLOG_POSTS;
     try {
       const saved = localStorage.getItem(STORAGE_KEY_POSTS);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        rawPosts = JSON.parse(saved);
+      }
     } catch {
       // fallback
     }
-    return BLOG_POSTS;
+    // Clean old author details from posts since profile data was deleted
+    return rawPosts.map((p) => {
+      if (p.author?.name === 'Prof. Sulekh Kumar') {
+        return {
+          ...p,
+          author: {
+            name: '',
+            title: '',
+            avatar: '',
+          },
+        };
+      }
+      return p;
+    });
   });
 
-  // 2. Author Profile state with localStorage persistence and AUTHOR_PROFILE default
+  // 2. Author Profile state with localStorage persistence (defaults to empty)
   const [profile, setProfile] = useState<AuthorProfile>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_AUTHOR);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed && parsed.name) {
+        if (parsed && parsed.name && parsed.name !== 'Prof. Sulekh Kumar') {
           return parsed;
+        } else {
+          localStorage.removeItem(STORAGE_KEY_AUTHOR);
         }
       }
     } catch {
       // fallback
     }
-    return AUTHOR_PROFILE;
+    return EMPTY_AUTHOR_PROFILE;
   });
 
   // 3. Site Settings state (Title, Tagline, Banner)
@@ -197,7 +216,7 @@ export default function App() {
         setPosts(cloudPosts);
       }
       const cloudProfile = await fetchSupabaseProfile();
-      if (cloudProfile && cloudProfile.name) {
+      if (cloudProfile && cloudProfile.name && cloudProfile.name !== 'Prof. Sulekh Kumar') {
         setProfile(cloudProfile);
       }
       const cloudSettings = await fetchSupabaseSettings();

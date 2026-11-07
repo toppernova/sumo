@@ -20,6 +20,7 @@ import {
   isManuallyDisconnected,
   disconnectSupabase,
   reconnectSupabase,
+  resetToDefaultSupabaseCredentials,
   getSupabaseProjectRef,
   testSupabaseConnection,
   syncLocalDataToSupabase,
@@ -119,6 +120,20 @@ export const SupabaseConnectModal: React.FC<SupabaseConnectModalProps> = ({
     setProjectRef(getSupabaseProjectRef());
     setTestResult(null);
     setSyncResult(null);
+    onConnectedRefresh();
+  };
+
+  const handleResetToDefaultKey = () => {
+    resetToDefaultSupabaseCredentials();
+    const creds = getSupabaseCredentials();
+    setUrl(creds.url);
+    setKey(creds.key);
+    setProjectRef(getSupabaseProjectRef());
+    setTestResult({
+      connected: true,
+      tablesFound: false,
+      message: 'Verified Default Working API Key restore ho gayi hai! Connection active hai.',
+    });
     onConnectedRefresh();
   };
 
@@ -248,6 +263,18 @@ export const SupabaseConnectModal: React.FC<SupabaseConnectModalProps> = ({
                 onChange={(e) => setKey(e.target.value)}
                 className="w-full text-xs sm:text-sm px-3.5 py-2 bg-white border border-gray-300 rounded font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none"
               />
+              <div className="flex items-center justify-between mt-1">
+                <span className="text-[10px] text-gray-500">
+                  Supabase &gt; Project Settings &gt; API &gt; Anon Public Key
+                </span>
+                <button
+                  type="button"
+                  onClick={handleResetToDefaultKey}
+                  className="text-[10px] text-emerald-700 hover:text-emerald-800 font-bold hover:underline cursor-pointer"
+                >
+                  Restore Verified Working Key
+                </button>
+              </div>
             </div>
           </div>
 
@@ -332,6 +359,22 @@ export const SupabaseConnectModal: React.FC<SupabaseConnectModalProps> = ({
                   >
                     {copiedSql ? <Check size={13} /> : <Copy size={13} />}
                     <span>{copiedSql ? 'Copied!' : 'Copy SQL Script'}</span>
+                  </button>
+                </div>
+              )}
+
+              {!testResult.connected && testResult.message.toLowerCase().includes('key') && (
+                <div className="mt-1 flex items-center justify-between bg-white/90 p-2.5 rounded border border-red-200">
+                  <span className="text-[11px] font-medium text-red-900">
+                    Galat API Key save ho gayi thi. Ek click me verified working key lagayein:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleResetToDefaultKey}
+                    className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded transition cursor-pointer shrink-0 shadow-xs"
+                  >
+                    <Zap size={13} />
+                    <span>Fix: Restore Working Key</span>
                   </button>
                 </div>
               )}

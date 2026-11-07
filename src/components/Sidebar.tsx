@@ -62,7 +62,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               alt={profile.name || 'Author'}
               className="w-full h-full object-cover object-top"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = '/author-profile.png';
+                (e.target as HTMLElement).style.display = 'none';
               }}
             />
           ) : (

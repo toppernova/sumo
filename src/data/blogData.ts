@@ -67,24 +67,15 @@ export const EMPTY_AUTHOR_PROFILE: AuthorProfile = {
 };
 
 export const AUTHOR_PROFILE: AuthorProfile = {
-  name: "Prof. Sulekh Kumar",
-  fullTitle: "PROF. SULEKH KUMAR(QUALIFIED UGC NET DEC-2024 & 2025 FOR ASSISTANT PROFESSOR & ADMISSION TO PH.D. IN COMPUTER SCIENCE & APPLICATION)",
-  avatar: "/author-profile.png",
-  bio: "Sulekh Kumar from Palamu District of Jharkhand. I have done B.Sc. IT from Ranchi College, Ranchi. I have also done MCA from Dr. Shyama Prasad Mukherjee University. I am recently Working as Assistant Professor in RVS College of Engineering And Technology,Jamshedpur ,Jharkhand",
-  district: "Palamu District, Jharkhand, India",
-  education: [
-    { degree: "UGC NET Qualified", details: "Dec-2024 & 2025 for Assistant Professor & Ph.D. Admission in Computer Science & Application" },
-    { degree: "MCA (Master of Computer Applications)", institution: "Dr. Shyama Prasad Mukherjee University, Ranchi" },
-    { degree: "B.Sc. IT (Bachelor of Science in Information Technology)", institution: "Ranchi College, Ranchi" }
-  ],
-  currentRole: "Assistant Professor, RVS College of Engineering and Technology, Jamshedpur, Jharkhand",
-  researchInterests: [
-    "Computer Science & Application",
-    "Artificial Intelligence & Machine Learning",
-    "Information Technology Education",
-    "Positive Psychology & Motivational Research"
-  ],
-  bloggerProfileUrl: "https://www.blogger.com/profile/08588688521541723554"
+  name: "",
+  fullTitle: "",
+  avatar: "",
+  bio: "",
+  district: "",
+  education: [],
+  currentRole: "",
+  researchInterests: [],
+  bloggerProfileUrl: ""
 };
 
 export const BLOG_POSTS: BlogPost[] = [
