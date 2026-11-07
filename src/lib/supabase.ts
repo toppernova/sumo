@@ -4,6 +4,10 @@ import { BlogPost, AuthorProfile, SiteSettings, Comment } from '../data/blogData
 const STORAGE_KEY_CUSTOM_URL = 'sulekh_supabase_custom_url';
 const STORAGE_KEY_CUSTOM_KEY = 'sulekh_supabase_custom_key';
 
+// Default Supabase project credentials for Motivation & Research Blog
+const DEFAULT_PROJECT_URL = 'https://fwyuvemoesinkpjitjbf.supabase.co';
+const DEFAULT_ANON_KEY = 'sb_publishable_8zoV5fJT4tV7AVz9Dj2luw_4yf_5aQI';
+
 export function getSupabaseCredentials(): { url: string; key: string } {
   const envUrl = import.meta.env.VITE_SUPABASE_URL || '';
   const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -12,8 +16,8 @@ export function getSupabaseCredentials(): { url: string; key: string } {
   const localKey = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY_CUSTOM_KEY) || '' : '';
 
   return {
-    url: normalizeSupabaseUrl(envUrl || localUrl),
-    key: (envKey || localKey).trim(),
+    url: normalizeSupabaseUrl(localUrl || envUrl || DEFAULT_PROJECT_URL),
+    key: (localKey || envKey || DEFAULT_ANON_KEY).trim(),
   };
 }
 
@@ -197,8 +201,11 @@ create table if not exists public.site_settings (
   site_title text default 'Motivation, Education and Research',
   tagline text default '',
   header_bg_image text default '/ocean-header.jpg',
+  admin_passcode_hash text default '',
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+
+alter table public.site_settings add column if not exists admin_passcode_hash text default '';
 
 -- 4. Comments Table
 create table if not exists public.comments (
@@ -526,6 +533,61 @@ export async function upsertSupabaseSettings(settings: SiteSettings): Promise<bo
       updated_at: new Date().toISOString(),
     });
 
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+// -------------------------------------------------------------
+// CLOUD ADMIN PASSWORD SYNCHRONIZATION
+// -------------------------------------------------------------
+
+export async function updateSupabaseUserPassword(
+  newPassword: string
+): Promise<{ success: boolean; message?: string }> {
+  const client = getSupabaseClient();
+  if (!client) return { success: false, message: 'Supabase client not initialized' };
+  try {
+    const { error } = await client.auth.updateUser({ password: newPassword });
+    if (error) {
+      return { success: false, message: error.message };
+    }
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, message: err?.message };
+  }
+}
+
+export async function getCloudPasscodeHash(): Promise<string | null> {
+  if (!isSupabaseConfigured()) return null;
+  const client = getSupabaseClient();
+  if (!client) return null;
+  try {
+    const { data, error } = await client
+      .from('site_settings')
+      .select('admin_passcode_hash')
+      .eq('id', 'main_settings')
+      .single();
+    if (error || !data) return null;
+    return (data as any).admin_passcode_hash || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveCloudPasscodeHash(hash: string): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+  const client = getSupabaseClient();
+  if (!client) return false;
+  try {
+    const { error } = await client
+      .from('site_settings')
+      .update({
+        admin_passcode_hash: hash,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', 'main_settings');
     return !error;
   } catch {
     return false;

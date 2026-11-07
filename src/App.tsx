@@ -8,7 +8,6 @@ import {
   BLOG_POSTS,
   AUTHOR_PROFILE,
   DEFAULT_SITE_SETTINGS,
-  EMPTY_AUTHOR_PROFILE,
   EMPTY_SITE_SETTINGS,
   BlogPost,
   Comment,
@@ -92,21 +91,20 @@ export default function App() {
     return BLOG_POSTS;
   });
 
-  // 2. Author Profile state with localStorage persistence (empty by default so admin fills their own)
+  // 2. Author Profile state with localStorage persistence and AUTHOR_PROFILE default
   const [profile, setProfile] = useState<AuthorProfile>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_AUTHOR);
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Only retain if it's a custom filled profile, not the default Sulekh Kumar
-        if (parsed && parsed.name && parsed.name !== 'Prof. Sulekh Kumar') {
+        if (parsed && parsed.name) {
           return parsed;
         }
       }
     } catch {
       // fallback
     }
-    return EMPTY_AUTHOR_PROFILE;
+    return AUTHOR_PROFILE;
   });
 
   // 3. Site Settings state (Title, Tagline, Banner)

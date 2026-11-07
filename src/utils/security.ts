@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { getCloudPasscodeHash, saveCloudPasscodeHash, updateSupabaseUserPassword } from '../lib/supabase';
+
 // Enterprise-grade client security for Admin authentication
 const SALT = 'sulekh_secure_admin_salt_v3';
 const STORAGE_HASH_KEY = 'blog_admin_sec_hash_v3';
@@ -39,7 +41,35 @@ export function setStoredPasscodeHash(hash: string): void {
 }
 
 export async function verifyPasscode(input: string): Promise<boolean> {
-  const inputHash = await hashPasscode(input);
+  const cleanInput = (input || '').trim();
+  if (!cleanInput) return false;
+
+  const inputHash = await hashPasscode(cleanInput);
+
+  // 1. Check Cloud Hash from Supabase first (shared across all devices & incognito)
+  try {
+    const cloudHash = await getCloudPasscodeHash();
+    if (cloudHash) {
+      if (inputHash === cloudHash) {
+        // Cache to local storage
+        localStorage.setItem(STORAGE_HASH_KEY, cloudHash);
+        localStorage.setItem('blog_admin_has_custom_passcode', 'true');
+        return true;
+      }
+      // If cloud has custom password, admin123 is strictly blocked
+      if (cleanInput === DEFAULT_PASSCODE) {
+        return false;
+      }
+      return false;
+    }
+  } catch {}
+
+  // 2. If custom passcode was set locally, admin123 is strictly blocked
+  if (hasCustomPasscodeSet() && cleanInput === DEFAULT_PASSCODE) {
+    return false;
+  }
+
+  // 3. Fallback to local stored hash
   const storedHash = await getStoredPasscodeHash();
   return inputHash === storedHash;
 }
@@ -48,22 +78,42 @@ export async function changeAdminPasscode(
   currentPasscode: string,
   newPasscode: string
 ): Promise<{ success: boolean; message: string }> {
-  const isCurrentValid = await verifyPasscode(currentPasscode);
-  if (!isCurrentValid) {
-    return {
-      success: false,
-      message: 'Current password galat hai! Kripya sahi purana password enter karein.',
-    };
+  // If user is already an authenticated admin with valid session, allow changing directly!
+  const isSessionAuth = isSessionValid();
+  if (!isSessionAuth) {
+    const isCurrentValid = await verifyPasscode(currentPasscode);
+    if (!isCurrentValid) {
+      return {
+        success: false,
+        message: 'Current password galat hai! Kripya sahi purana password enter karein.',
+      };
+    }
   }
-  if (!newPasscode || newPasscode.trim().length < 6) {
+
+  const cleanNew = (newPasscode || '').trim();
+  if (!cleanNew || cleanNew.length < 6) {
     return {
       success: false,
       message: 'Naya password kam se kam 6 characters ka hona chahiye.',
     };
   }
-  const newHash = await hashPasscode(newPasscode.trim());
+
+  const newHash = await hashPasscode(cleanNew);
+
+  // 1. Save in local browser storage
   setStoredPasscodeHash(newHash);
   localStorage.setItem('blog_admin_has_custom_passcode', 'true');
+
+  // 2. Sync to Supabase Cloud so all devices & incognito tabs get the new password
+  try {
+    await saveCloudPasscodeHash(newHash);
+  } catch {}
+
+  // 3. Also update Supabase Auth User password if an account is connected
+  try {
+    await updateSupabaseUserPassword(cleanNew);
+  } catch {}
+
   return {
     success: true,
     message: 'Admin password successfully change ho gaya hai!',

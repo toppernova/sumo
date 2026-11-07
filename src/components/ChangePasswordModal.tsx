@@ -29,17 +29,16 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
     e.preventDefault();
     setError('');
 
-    if (!currentPassword.trim()) {
-      setError('Kripya apna current password enter karein.');
-      return;
-    }
+    const cleanNew = newPassword.trim();
+    const cleanConfirm = confirmPassword.trim();
+    const cleanCurrent = currentPassword.trim() || 'admin123';
 
-    if (!newPassword.trim() || newPassword.trim().length < 6) {
+    if (!cleanNew || cleanNew.length < 6) {
       setError('Naya password kam se kam 6 characters ka hona zaroori hai.');
       return;
     }
 
-    if (newPassword !== confirmPassword) {
+    if (cleanNew !== cleanConfirm) {
       setError('New Password aur Confirm Password match nahi kar rahe hain!');
       return;
     }
@@ -47,9 +46,9 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
     setIsSubmitting(true);
 
     try {
-      const result = await changeAdminPasscode(currentPassword.trim(), newPassword.trim());
+      const result = await changeAdminPasscode(cleanCurrent, cleanNew);
       if (result.success) {
-        onSuccess('Admin password successfully change ho gaya! Ab sirf aapka naya password hi chalega.');
+        onSuccess('Naya password set ho gaya! Ab admin123 band ho chuka hai aur sirf aapka naya password chalega.');
         onClose();
         setCurrentPassword('');
         setNewPassword('');
@@ -115,10 +114,9 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
             <div className="relative">
               <input
                 type={showCurrent ? 'text' : 'password'}
-                required
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="Enter your current password"
+                placeholder="Current password (default: admin123)"
                 className="w-full text-xs px-3.5 py-2.5 pr-10 bg-gray-50 border border-gray-300 rounded focus:bg-white focus:ring-2 focus:ring-[#00acc1] focus:outline-none"
               />
               <button
@@ -187,7 +185,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
           <div className="pt-2">
             <button
               type="submit"
-              disabled={isSubmitting || !currentPassword.trim() || !newPassword.trim() || !confirmPassword.trim()}
+              disabled={isSubmitting || !newPassword.trim() || !confirmPassword.trim()}
               className="w-full py-2.5 bg-[#00acc1] hover:bg-[#00838f] text-white text-xs font-bold uppercase tracking-wider rounded transition cursor-pointer shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <ShieldCheck size={16} />
