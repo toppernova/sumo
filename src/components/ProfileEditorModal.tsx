@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Upload, User, Plus, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { X, Save, Upload, User, Plus, Trash2, AlertCircle, CheckCircle2, Copy, Check } from 'lucide-react';
 import { AuthorProfile } from '../data/blogData';
 import { compressImage, uploadImageToSupabaseStorage } from '../utils/imageUtils';
-import { isSupabaseConfigured } from '../lib/supabase';
+import { isSupabaseConfigured, SUPABASE_STORAGE_SQL } from '../lib/supabase';
 
 interface ProfileEditorModalProps {
   isOpen: boolean;
@@ -28,6 +28,13 @@ export const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState('');
   const [avatarSuccess, setAvatarSuccess] = useState('');
+  const [copiedStorageSql, setCopiedStorageSql] = useState(false);
+
+  const handleCopyStorageSql = () => {
+    navigator.clipboard.writeText(SUPABASE_STORAGE_SQL);
+    setCopiedStorageSql(true);
+    setTimeout(() => setCopiedStorageSql(false), 2500);
+  };
 
   useEffect(() => {
     if (profile) {
@@ -202,9 +209,24 @@ export const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
                 </div>
 
                 {avatarError && (
-                  <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700 flex items-center gap-1.5">
-                    <AlertCircle size={14} className="text-red-500 shrink-0" />
-                    <span>{avatarError}</span>
+                  <div className="p-2.5 bg-amber-50 border border-amber-200 rounded text-xs text-amber-900 space-y-1.5">
+                    <div className="flex items-start gap-1.5">
+                      <AlertCircle size={14} className="text-amber-600 shrink-0 mt-0.5" />
+                      <span className="leading-tight">{avatarError}</span>
+                    </div>
+                    <div className="flex items-center gap-2 pt-1 border-t border-amber-200/60">
+                      <button
+                        type="button"
+                        onClick={handleCopyStorageSql}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-amber-300 hover:bg-amber-100 text-amber-900 text-xs font-semibold rounded cursor-pointer transition shadow-2xs"
+                      >
+                        {copiedStorageSql ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                        <span>{copiedStorageSql ? 'Copied Storage SQL!' : 'Copy Storage SQL Script'}</span>
+                      </button>
+                      <span className="text-[11px] text-amber-700">
+                        (Supabase SQL Editor me paste karke Run karein)
+                      </span>
+                    </div>
                   </div>
                 )}
 
