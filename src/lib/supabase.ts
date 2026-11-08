@@ -275,10 +275,12 @@ create table if not exists public.author_profile (
   current_job_role text default '',
   research_interests jsonb default '[]'::jsonb,
   blogger_profile_url text default '',
+  social_links jsonb default '{}'::jsonb,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
 alter table public.author_profile add column if not exists current_job_role text default '';
+alter table public.author_profile add column if not exists social_links jsonb default '{}'::jsonb;
 
 -- 3. Site Settings Table
 create table if not exists public.site_settings (
@@ -286,11 +288,13 @@ create table if not exists public.site_settings (
   site_title text default 'Motivation, Education and Research',
   tagline text default '',
   header_bg_image text default '/ocean-header.jpg',
+  background_color text default '#58c6d5',
   admin_passcode_hash text default '',
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
 alter table public.site_settings add column if not exists admin_passcode_hash text default '';
+alter table public.site_settings add column if not exists background_color text default '#58c6d5';
 
 -- 4. Comments Table
 create table if not exists public.comments (
@@ -574,6 +578,7 @@ export async function fetchSupabaseProfile(): Promise<AuthorProfile | null> {
       currentRole: data.current_job_role || data.current_role || '',
       researchInterests: data.research_interests || [],
       bloggerProfileUrl: data.blogger_profile_url || '',
+      socialLinks: data.social_links || {},
     };
   } catch {
     return null;
@@ -586,7 +591,7 @@ export async function upsertSupabaseProfile(profile: AuthorProfile): Promise<boo
   if (!client) return false;
 
   try {
-    const { error } = await client.from('author_profile').upsert({
+    const payload: any = {
       id: 'main_profile',
       name: profile.name,
       full_title: profile.fullTitle,
@@ -597,8 +602,16 @@ export async function upsertSupabaseProfile(profile: AuthorProfile): Promise<boo
       current_job_role: profile.currentRole,
       research_interests: profile.researchInterests,
       blogger_profile_url: profile.bloggerProfileUrl,
+      social_links: profile.socialLinks || {},
       updated_at: new Date().toISOString(),
-    });
+    };
+
+    const { error } = await client.from('author_profile').upsert(payload);
+    if (error && error.message && error.message.includes('social_links')) {
+      delete payload.social_links;
+      const retry = await client.from('author_profile').upsert(payload);
+      return !retry.error;
+    }
 
     return !error;
   } catch {
@@ -624,6 +637,7 @@ export async function fetchSupabaseSettings(): Promise<SiteSettings | null> {
       siteTitle: data.site_title || 'Motivation, Education and Research',
       tagline: data.tagline || '',
       headerBgImage: data.header_bg_image || '/ocean-header.jpg',
+      backgroundColor: data.background_color || '#58c6d5',
     };
   } catch {
     return null;
@@ -636,13 +650,21 @@ export async function upsertSupabaseSettings(settings: SiteSettings): Promise<bo
   if (!client) return false;
 
   try {
-    const { error } = await client.from('site_settings').upsert({
+    const payload: any = {
       id: 'main_settings',
       site_title: settings.siteTitle,
       tagline: settings.tagline,
       header_bg_image: settings.headerBgImage,
+      background_color: settings.backgroundColor || '#58c6d5',
       updated_at: new Date().toISOString(),
-    });
+    };
+
+    const { error } = await client.from('site_settings').upsert(payload);
+    if (error && error.message && error.message.includes('background_color')) {
+      delete payload.background_color;
+      const retry = await client.from('site_settings').upsert(payload);
+      return !retry.error;
+    }
 
     return !error;
   } catch {

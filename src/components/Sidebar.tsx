@@ -1,7 +1,24 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, X, Filter, Edit2, Lock } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronUp,
+  X,
+  Filter,
+  Edit2,
+  Lock,
+  Instagram,
+  Twitter,
+  Facebook,
+  Linkedin,
+  Youtube,
+  MessageCircle,
+  Send,
+  Github,
+  Globe,
+  Mail,
+} from 'lucide-react';
 import { AuthorProfile, BlogPost } from '../data/blogData';
-import { getArchiveGroups, ArchiveGroup } from '../utils/blogUtils';
+import { getArchiveGroups, ArchiveGroup, formatSocialUrl } from '../utils/blogUtils';
 
 interface SidebarProps {
   posts: BlogPost[];
@@ -134,6 +151,120 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           )}
         </div>
+
+        {/* Social Media Links Widget - ONLY SHOWS LINKS ADDED BY ADMIN */}
+        {profile.socialLinks && Object.values(profile.socialLinks).some((v) => Boolean(v && v.trim())) && (
+          <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-center flex-wrap gap-2 w-full px-2">
+            {profile.socialLinks.instagram && (
+              <a
+                href={formatSocialUrl('instagram', profile.socialLinks.instagram)}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Instagram"
+                className="w-7 h-7 rounded-full bg-pink-50 text-pink-600 hover:bg-pink-600 hover:text-white flex items-center justify-center transition shadow-2xs cursor-pointer"
+              >
+                <Instagram size={14} />
+              </a>
+            )}
+            {profile.socialLinks.twitter && (
+              <a
+                href={formatSocialUrl('twitter', profile.socialLinks.twitter)}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Twitter / X"
+                className="w-7 h-7 rounded-full bg-sky-50 text-sky-600 hover:bg-sky-500 hover:text-white flex items-center justify-center transition shadow-2xs cursor-pointer"
+              >
+                <Twitter size={14} />
+              </a>
+            )}
+            {profile.socialLinks.facebook && (
+              <a
+                href={formatSocialUrl('facebook', profile.socialLinks.facebook)}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Facebook"
+                className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white flex items-center justify-center transition shadow-2xs cursor-pointer"
+              >
+                <Facebook size={14} />
+              </a>
+            )}
+            {profile.socialLinks.linkedin && (
+              <a
+                href={formatSocialUrl('linkedin', profile.socialLinks.linkedin)}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="LinkedIn"
+                className="w-7 h-7 rounded-full bg-blue-50 text-blue-700 hover:bg-blue-700 hover:text-white flex items-center justify-center transition shadow-2xs cursor-pointer"
+              >
+                <Linkedin size={14} />
+              </a>
+            )}
+            {profile.socialLinks.youtube && (
+              <a
+                href={formatSocialUrl('youtube', profile.socialLinks.youtube)}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="YouTube"
+                className="w-7 h-7 rounded-full bg-red-50 text-red-600 hover:bg-red-600 hover:text-white flex items-center justify-center transition shadow-2xs cursor-pointer"
+              >
+                <Youtube size={14} />
+              </a>
+            )}
+            {profile.socialLinks.whatsapp && (
+              <a
+                href={formatSocialUrl('whatsapp', profile.socialLinks.whatsapp)}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="WhatsApp"
+                className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white flex items-center justify-center transition shadow-2xs cursor-pointer"
+              >
+                <MessageCircle size={14} />
+              </a>
+            )}
+            {profile.socialLinks.telegram && (
+              <a
+                href={formatSocialUrl('telegram', profile.socialLinks.telegram)}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Telegram"
+                className="w-7 h-7 rounded-full bg-sky-50 text-sky-500 hover:bg-sky-500 hover:text-white flex items-center justify-center transition shadow-2xs cursor-pointer"
+              >
+                <Send size={14} />
+              </a>
+            )}
+            {profile.socialLinks.github && (
+              <a
+                href={formatSocialUrl('github', profile.socialLinks.github)}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="GitHub"
+                className="w-7 h-7 rounded-full bg-gray-100 text-gray-800 hover:bg-gray-800 hover:text-white flex items-center justify-center transition shadow-2xs cursor-pointer"
+              >
+                <Github size={14} />
+              </a>
+            )}
+            {profile.socialLinks.website && (
+              <a
+                href={formatSocialUrl('website', profile.socialLinks.website)}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Website / Portfolio"
+                className="w-7 h-7 rounded-full bg-teal-50 text-teal-700 hover:bg-[#00acc1] hover:text-white flex items-center justify-center transition shadow-2xs cursor-pointer"
+              >
+                <Globe size={14} />
+              </a>
+            )}
+            {profile.socialLinks.email && (
+              <a
+                href={formatSocialUrl('email', profile.socialLinks.email)}
+                title="Email"
+                className="w-7 h-7 rounded-full bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white flex items-center justify-center transition shadow-2xs cursor-pointer"
+              >
+                <Mail size={14} />
+              </a>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="w-full border-t border-gray-200/60" />

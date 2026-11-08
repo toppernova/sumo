@@ -1,6 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Upload, User, Plus, Trash2, AlertCircle, CheckCircle2, Copy, Check } from 'lucide-react';
-import { AuthorProfile } from '../data/blogData';
+import {
+  X,
+  Save,
+  Upload,
+  User,
+  Plus,
+  Trash2,
+  AlertCircle,
+  CheckCircle2,
+  Copy,
+  Check,
+  Instagram,
+  Twitter,
+  Facebook,
+  Linkedin,
+  Youtube,
+  MessageCircle,
+  Send,
+  Github,
+  Globe,
+  Mail,
+  Share2,
+} from 'lucide-react';
+import { AuthorProfile, SocialLinks } from '../data/blogData';
 import { compressImage, uploadImageToSupabaseStorage } from '../utils/imageUtils';
 import { isSupabaseConfigured, SUPABASE_STORAGE_SQL } from '../lib/supabase';
 
@@ -25,6 +47,7 @@ export const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
   const [currentRole, setCurrentRole] = useState('');
   const [education, setEducation] = useState<Array<{ degree: string; institution?: string; details?: string }>>([]);
   const [researchInput, setResearchInput] = useState('');
+  const [socialLinks, setSocialLinks] = useState<SocialLinks>({});
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState('');
   const [avatarSuccess, setAvatarSuccess] = useState('');
@@ -46,6 +69,7 @@ export const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
       setCurrentRole(profile.currentRole || '');
       setEducation(profile.education ? [...profile.education] : []);
       setResearchInput(profile.researchInterests ? profile.researchInterests.join(', ') : '');
+      setSocialLinks(profile.socialLinks ? { ...profile.socialLinks } : {});
     }
     setAvatarError('');
     setAvatarSuccess('');
@@ -119,6 +143,16 @@ export const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
       .map((s) => s.trim())
       .filter(Boolean);
 
+    // Only keep social media links that have an actual value (empty links are omitted)
+    const cleanSocialLinks: SocialLinks = {};
+    if (socialLinks) {
+      Object.entries(socialLinks).forEach(([key, val]) => {
+        if (val && typeof val === 'string' && val.trim()) {
+          cleanSocialLinks[key as keyof SocialLinks] = val.trim();
+        }
+      });
+    }
+
     onSave({
       ...profile,
       name: name.trim(),
@@ -129,13 +163,14 @@ export const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
       currentRole: currentRole.trim(),
       education: education.filter((e) => e.degree.trim()),
       researchInterests: researchArr,
+      socialLinks: cleanSocialLinks,
     });
     onClose();
   };
 
   const handleClearAllProfile = () => {
     const confirm = window.confirm(
-      'Kya aap sach me saara profile data delete karna chahte hain? Sabhi fields (Name, Title, Bio, Education, District, Photo) empty ho jayenge.'
+      'Kya aap sach me saara profile data delete karna chahte hain? Sabhi fields (Name, Title, Bio, Education, District, Photo, Social Links) empty ho jayenge.'
     );
     if (!confirm) return;
     setName('');
@@ -146,16 +181,18 @@ export const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
     setCurrentRole('');
     setEducation([]);
     setResearchInput('');
+    setSocialLinks({});
     onSave({
       name: '',
       fullTitle: '',
       avatar: '',
       bio: '',
       district: '',
-      education: [],
       currentRole: '',
+      education: [],
       researchInterests: [],
       bloggerProfileUrl: '',
+      socialLinks: {},
     });
     onClose();
   };
@@ -283,7 +320,7 @@ export const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Prof. Sulekh Kumar, Er. Rahul Sharma..."
+                placeholder="e.g. Shruti Kumari, Er. Rahul Sharma..."
                 required
                 className="w-full text-sm px-3.5 py-2 bg-white border border-gray-300 rounded focus:ring-2 focus:ring-[#00acc1] focus:outline-none"
               />
@@ -403,6 +440,267 @@ export const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
                 placeholder="Computer Science, AI & ML, Positive Motivation, Education..."
                 className="w-full text-xs px-3.5 py-2 bg-white border border-gray-300 rounded focus:ring-1 focus:ring-[#00acc1] focus:outline-none"
               />
+            </div>
+
+            {/* Social Media Links Widget */}
+            <div className="p-4 bg-teal-50/60 border border-teal-100 rounded-lg space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Share2 className="w-4 h-4 text-[#00acc1]" />
+                  <label className="text-xs font-bold text-gray-800 uppercase tracking-wide">
+                    Social Media Links (सोशल मीडिया लिंक्स)
+                  </label>
+                </div>
+                <span className="text-[10px] text-teal-800 bg-teal-100/70 font-semibold px-2 py-0.5 rounded-full">
+                  Optional • Sirf added links show honge
+                </span>
+              </div>
+
+              <p className="text-[11px] text-gray-600 leading-relaxed">
+                Aap jis social media ka link yahan enter karenge, profile section men <b>sirf wahi social media</b> icons/buttons dikhenge. Jo link khali rahega wo automatically chhip jayega.
+              </p>
+
+              <div className="space-y-2.5">
+                {/* Instagram */}
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center shrink-0">
+                    <Instagram size={14} />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Instagram URL ya @username (e.g. https://instagram.com/yourname)"
+                    value={socialLinks.instagram || ''}
+                    onChange={(e) => setSocialLinks({ ...socialLinks, instagram: e.target.value })}
+                    className="grow text-xs px-3 py-1.5 bg-white border border-gray-300 rounded focus:ring-1 focus:ring-[#00acc1] focus:outline-none"
+                  />
+                  {socialLinks.instagram && (
+                    <button
+                      type="button"
+                      onClick={() => setSocialLinks({ ...socialLinks, instagram: '' })}
+                      className="text-gray-400 hover:text-red-500 p-1 cursor-pointer"
+                      title="Clear Instagram"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Twitter / X */}
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center shrink-0 font-bold text-xs">
+                    <Twitter size={14} />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Twitter / X URL ya @handle (e.g. https://x.com/yourname)"
+                    value={socialLinks.twitter || ''}
+                    onChange={(e) => setSocialLinks({ ...socialLinks, twitter: e.target.value })}
+                    className="grow text-xs px-3 py-1.5 bg-white border border-gray-300 rounded focus:ring-1 focus:ring-[#00acc1] focus:outline-none"
+                  />
+                  {socialLinks.twitter && (
+                    <button
+                      type="button"
+                      onClick={() => setSocialLinks({ ...socialLinks, twitter: '' })}
+                      className="text-gray-400 hover:text-red-500 p-1 cursor-pointer"
+                      title="Clear Twitter / X"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Facebook */}
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                    <Facebook size={14} />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Facebook Profile URL (e.g. https://facebook.com/yourname)"
+                    value={socialLinks.facebook || ''}
+                    onChange={(e) => setSocialLinks({ ...socialLinks, facebook: e.target.value })}
+                    className="grow text-xs px-3 py-1.5 bg-white border border-gray-300 rounded focus:ring-1 focus:ring-[#00acc1] focus:outline-none"
+                  />
+                  {socialLinks.facebook && (
+                    <button
+                      type="button"
+                      onClick={() => setSocialLinks({ ...socialLinks, facebook: '' })}
+                      className="text-gray-400 hover:text-red-500 p-1 cursor-pointer"
+                      title="Clear Facebook"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {/* LinkedIn */}
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
+                    <Linkedin size={14} />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="LinkedIn Profile URL (e.g. https://linkedin.com/in/yourname)"
+                    value={socialLinks.linkedin || ''}
+                    onChange={(e) => setSocialLinks({ ...socialLinks, linkedin: e.target.value })}
+                    className="grow text-xs px-3 py-1.5 bg-white border border-gray-300 rounded focus:ring-1 focus:ring-[#00acc1] focus:outline-none"
+                  />
+                  {socialLinks.linkedin && (
+                    <button
+                      type="button"
+                      onClick={() => setSocialLinks({ ...socialLinks, linkedin: '' })}
+                      className="text-gray-400 hover:text-red-500 p-1 cursor-pointer"
+                      title="Clear LinkedIn"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {/* YouTube */}
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                    <Youtube size={14} />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="YouTube Channel URL (e.g. https://youtube.com/@yourchannel)"
+                    value={socialLinks.youtube || ''}
+                    onChange={(e) => setSocialLinks({ ...socialLinks, youtube: e.target.value })}
+                    className="grow text-xs px-3 py-1.5 bg-white border border-gray-300 rounded focus:ring-1 focus:ring-[#00acc1] focus:outline-none"
+                  />
+                  {socialLinks.youtube && (
+                    <button
+                      type="button"
+                      onClick={() => setSocialLinks({ ...socialLinks, youtube: '' })}
+                      className="text-gray-400 hover:text-red-500 p-1 cursor-pointer"
+                      title="Clear YouTube"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {/* WhatsApp */}
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                    <MessageCircle size={14} />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="WhatsApp Number ya Link (e.g. https://wa.me/919876543210 ya 919876543210)"
+                    value={socialLinks.whatsapp || ''}
+                    onChange={(e) => setSocialLinks({ ...socialLinks, whatsapp: e.target.value })}
+                    className="grow text-xs px-3 py-1.5 bg-white border border-gray-300 rounded focus:ring-1 focus:ring-[#00acc1] focus:outline-none"
+                  />
+                  {socialLinks.whatsapp && (
+                    <button
+                      type="button"
+                      onClick={() => setSocialLinks({ ...socialLinks, whatsapp: '' })}
+                      className="text-gray-400 hover:text-red-500 p-1 cursor-pointer"
+                      title="Clear WhatsApp"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Telegram */}
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-sky-100 text-sky-500 flex items-center justify-center shrink-0">
+                    <Send size={14} />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Telegram Link ya @username (e.g. https://t.me/yourusername)"
+                    value={socialLinks.telegram || ''}
+                    onChange={(e) => setSocialLinks({ ...socialLinks, telegram: e.target.value })}
+                    className="grow text-xs px-3 py-1.5 bg-white border border-gray-300 rounded focus:ring-1 focus:ring-[#00acc1] focus:outline-none"
+                  />
+                  {socialLinks.telegram && (
+                    <button
+                      type="button"
+                      onClick={() => setSocialLinks({ ...socialLinks, telegram: '' })}
+                      className="text-gray-400 hover:text-red-500 p-1 cursor-pointer"
+                      title="Clear Telegram"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {/* GitHub */}
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-gray-200 text-gray-800 flex items-center justify-center shrink-0">
+                    <Github size={14} />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="GitHub URL ya username (e.g. https://github.com/yourusername)"
+                    value={socialLinks.github || ''}
+                    onChange={(e) => setSocialLinks({ ...socialLinks, github: e.target.value })}
+                    className="grow text-xs px-3 py-1.5 bg-white border border-gray-300 rounded focus:ring-1 focus:ring-[#00acc1] focus:outline-none"
+                  />
+                  {socialLinks.github && (
+                    <button
+                      type="button"
+                      onClick={() => setSocialLinks({ ...socialLinks, github: '' })}
+                      className="text-gray-400 hover:text-red-500 p-1 cursor-pointer"
+                      title="Clear GitHub"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Personal Website / Portfolio */}
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center shrink-0">
+                    <Globe size={14} />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Personal Website / Portfolio (e.g. https://yourportfolio.com)"
+                    value={socialLinks.website || ''}
+                    onChange={(e) => setSocialLinks({ ...socialLinks, website: e.target.value })}
+                    className="grow text-xs px-3 py-1.5 bg-white border border-gray-300 rounded focus:ring-1 focus:ring-[#00acc1] focus:outline-none"
+                  />
+                  {socialLinks.website && (
+                    <button
+                      type="button"
+                      onClick={() => setSocialLinks({ ...socialLinks, website: '' })}
+                      className="text-gray-400 hover:text-red-500 p-1 cursor-pointer"
+                      title="Clear Website"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Email Address */}
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                    <Mail size={14} />
+                  </div>
+                  <input
+                    type="email"
+                    placeholder="Public Email Address (e.g. contact@example.com)"
+                    value={socialLinks.email || ''}
+                    onChange={(e) => setSocialLinks({ ...socialLinks, email: e.target.value })}
+                    className="grow text-xs px-3 py-1.5 bg-white border border-gray-300 rounded focus:ring-1 focus:ring-[#00acc1] focus:outline-none"
+                  />
+                  {socialLinks.email && (
+                    <button
+                      type="button"
+                      onClick={() => setSocialLinks({ ...socialLinks, email: '' })}
+                      className="text-gray-400 hover:text-red-500 p-1 cursor-pointer"
+                      title="Clear Email"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 

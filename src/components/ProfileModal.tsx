@@ -1,6 +1,27 @@
 import React from 'react';
-import { X, GraduationCap, Award, MapPin, Briefcase, BookOpen, ExternalLink, Edit2 } from 'lucide-react';
+import {
+  X,
+  GraduationCap,
+  Award,
+  MapPin,
+  Briefcase,
+  BookOpen,
+  ExternalLink,
+  Edit2,
+  Share2,
+  Instagram,
+  Twitter,
+  Facebook,
+  Linkedin,
+  Youtube,
+  MessageCircle,
+  Send,
+  Github,
+  Globe,
+  Mail,
+} from 'lucide-react';
 import { AuthorProfile } from '../data/blogData';
+import { formatSocialUrl } from '../utils/blogUtils';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -166,6 +187,136 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                         {interest}
                       </span>
                     ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Social Media Links - ONLY SHOWS PLATFORMS ADDED BY ADMIN */}
+            {profile.socialLinks && Object.values(profile.socialLinks).some((v) => Boolean(v && v.trim())) && (
+              <div className="flex items-start gap-2.5 pt-2 border-t border-gray-100">
+                <Share2 className="w-5 h-5 text-[#00acc1] shrink-0 mt-0.5" />
+                <div className="grow">
+                  <span className="font-medium text-gray-900 block mb-2">Connect on Social Media</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {profile.socialLinks.instagram && (
+                      <a
+                        href={formatSocialUrl('instagram', profile.socialLinks.instagram)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 p-2 rounded-md bg-pink-50/70 hover:bg-pink-100 text-pink-700 transition text-xs font-medium border border-pink-100 group"
+                      >
+                        <Instagram size={16} className="text-pink-600 shrink-0" />
+                        <span className="truncate">Instagram</span>
+                        <ExternalLink size={12} className="ml-auto opacity-50 group-hover:opacity-100" />
+                      </a>
+                    )}
+                    {profile.socialLinks.twitter && (
+                      <a
+                        href={formatSocialUrl('twitter', profile.socialLinks.twitter)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 p-2 rounded-md bg-sky-50/70 hover:bg-sky-100 text-sky-700 transition text-xs font-medium border border-sky-100 group"
+                      >
+                        <Twitter size={16} className="text-sky-500 shrink-0" />
+                        <span className="truncate">Twitter / X</span>
+                        <ExternalLink size={12} className="ml-auto opacity-50 group-hover:opacity-100" />
+                      </a>
+                    )}
+                    {profile.socialLinks.facebook && (
+                      <a
+                        href={formatSocialUrl('facebook', profile.socialLinks.facebook)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 p-2 rounded-md bg-blue-50/70 hover:bg-blue-100 text-blue-700 transition text-xs font-medium border border-blue-100 group"
+                      >
+                        <Facebook size={16} className="text-blue-600 shrink-0" />
+                        <span className="truncate">Facebook</span>
+                        <ExternalLink size={12} className="ml-auto opacity-50 group-hover:opacity-100" />
+                      </a>
+                    )}
+                    {profile.socialLinks.linkedin && (
+                      <a
+                        href={formatSocialUrl('linkedin', profile.socialLinks.linkedin)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 p-2 rounded-md bg-blue-50/70 hover:bg-blue-100 text-blue-800 transition text-xs font-medium border border-blue-200 group"
+                      >
+                        <Linkedin size={16} className="text-blue-700 shrink-0" />
+                        <span className="truncate">LinkedIn</span>
+                        <ExternalLink size={12} className="ml-auto opacity-50 group-hover:opacity-100" />
+                      </a>
+                    )}
+                    {profile.socialLinks.youtube && (
+                      <a
+                        href={formatSocialUrl('youtube', profile.socialLinks.youtube)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 p-2 rounded-md bg-red-50/70 hover:bg-red-100 text-red-700 transition text-xs font-medium border border-red-100 group"
+                      >
+                        <Youtube size={16} className="text-red-600 shrink-0" />
+                        <span className="truncate">YouTube</span>
+                        <ExternalLink size={12} className="ml-auto opacity-50 group-hover:opacity-100" />
+                      </a>
+                    )}
+                    {profile.socialLinks.whatsapp && (
+                      <a
+                        href={formatSocialUrl('whatsapp', profile.socialLinks.whatsapp)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 p-2 rounded-md bg-emerald-50/70 hover:bg-emerald-100 text-emerald-700 transition text-xs font-medium border border-emerald-100 group"
+                      >
+                        <MessageCircle size={16} className="text-emerald-600 shrink-0" />
+                        <span className="truncate">WhatsApp</span>
+                        <ExternalLink size={12} className="ml-auto opacity-50 group-hover:opacity-100" />
+                      </a>
+                    )}
+                    {profile.socialLinks.telegram && (
+                      <a
+                        href={formatSocialUrl('telegram', profile.socialLinks.telegram)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 p-2 rounded-md bg-sky-50/70 hover:bg-sky-100 text-sky-700 transition text-xs font-medium border border-sky-100 group"
+                      >
+                        <Send size={16} className="text-sky-500 shrink-0" />
+                        <span className="truncate">Telegram</span>
+                        <ExternalLink size={12} className="ml-auto opacity-50 group-hover:opacity-100" />
+                      </a>
+                    )}
+                    {profile.socialLinks.github && (
+                      <a
+                        href={formatSocialUrl('github', profile.socialLinks.github)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 p-2 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-800 transition text-xs font-medium border border-gray-200 group"
+                      >
+                        <Github size={16} className="text-gray-800 shrink-0" />
+                        <span className="truncate">GitHub</span>
+                        <ExternalLink size={12} className="ml-auto opacity-50 group-hover:opacity-100" />
+                      </a>
+                    )}
+                    {profile.socialLinks.website && (
+                      <a
+                        href={formatSocialUrl('website', profile.socialLinks.website)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 p-2 rounded-md bg-teal-50/70 hover:bg-teal-100 text-teal-800 transition text-xs font-medium border border-teal-100 group"
+                      >
+                        <Globe size={16} className="text-teal-700 shrink-0" />
+                        <span className="truncate">Website</span>
+                        <ExternalLink size={12} className="ml-auto opacity-50 group-hover:opacity-100" />
+                      </a>
+                    )}
+                    {profile.socialLinks.email && (
+                      <a
+                        href={formatSocialUrl('email', profile.socialLinks.email)}
+                        className="flex items-center gap-2 p-2 rounded-md bg-amber-50/70 hover:bg-amber-100 text-amber-800 transition text-xs font-medium border border-amber-100 group"
+                      >
+                        <Mail size={16} className="text-amber-700 shrink-0" />
+                        <span className="truncate">{profile.socialLinks.email.replace(/^mailto:/, '')}</span>
+                        <ExternalLink size={12} className="ml-auto opacity-50 group-hover:opacity-100" />
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>

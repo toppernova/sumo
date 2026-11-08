@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Share2, ArrowLeft, Send, User, Edit2, Trash2 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { BlogPost, Comment } from '../data/blogData';
-import { formatDate, extractYouTubeId } from '../utils/blogUtils';
+import { formatDate, extractYouTubeId, sanitizePostContent } from '../utils/blogUtils';
 
 interface SinglePostViewProps {
   post: BlogPost;
@@ -146,7 +146,7 @@ export const SinglePostView: React.FC<SinglePostViewProps> = ({
         <div
           className="text-[#555] font-roboto text-[15px] sm:text-base leading-relaxed my-6 space-y-4 prose max-w-none [&_p]:mb-4 [&_p]:leading-relaxed [&_blockquote]:border-l-4 [&_blockquote]:border-[#00acc1] [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-gray-600 [&_blockquote]:bg-gray-50/70 [&_blockquote]:py-2 [&_blockquote]:my-3 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-md [&_img]:mx-auto [&_img]:my-4 [&_img]:shadow-xs [&_iframe]:w-full [&_iframe]:aspect-video [&_iframe]:rounded-md [&_iframe]:my-4 [&_video]:w-full [&_video]:rounded-md [&_video]:my-4 [&_figure]:my-4 [&_figcaption]:text-xs [&_figcaption]:text-center [&_figcaption]:text-gray-500 [&_figcaption]:mt-1"
           dangerouslySetInnerHTML={{
-            __html: DOMPurify.sanitize(post.content, {
+            __html: DOMPurify.sanitize(sanitizePostContent(post.content), {
               ADD_TAGS: ['iframe', 'video', 'figure', 'figcaption', 'source'],
               ADD_ATTR: [
                 'allow',
@@ -167,19 +167,8 @@ export const SinglePostView: React.FC<SinglePostViewProps> = ({
 
         {/* Author signature footer */}
         <div className="mt-8 pt-6 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
-          <span>Posted by {post.author.name || 'Author'}</span>
-          {post.url ? (
-            <a
-              href={post.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[#00acc1] hover:underline"
-            >
-              Original Blogger Link
-            </a>
-          ) : (
-            <span className="text-gray-400">Custom Post</span>
-          )}
+          <span className="font-semibold text-gray-700">Posted by {post.author.name || 'Shruti Kumari'}</span>
+          <span className="text-gray-400 text-[11px]">Motivation, Education and Research</span>
         </div>
 
         {/* Comments Section */}

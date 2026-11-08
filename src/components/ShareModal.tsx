@@ -12,10 +12,10 @@ export const ShareModal: React.FC<ShareModalProps> = ({ post, onClose }) => {
 
   if (!post) return null;
 
-  const authorName = post.author?.name?.trim() || '';
+  const authorName = post.author?.name?.trim() || 'Shruti Kumari';
   const shareTitle = post.title || 'Motivation, Education and Research';
-  const shareUrl = window.location.origin + (post.url ? `?post=${post.id}` : '');
-  const shareText = authorName ? `${shareTitle} - Blog by ${authorName}` : shareTitle;
+  const shareUrl = `${window.location.origin}?post=${post.id}`;
+  const shareText = `${shareTitle} - Blog by ${authorName}`;
 
   const handleCopy = async () => {
     try {

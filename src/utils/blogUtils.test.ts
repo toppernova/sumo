@@ -11,6 +11,8 @@ import {
   createBlogPost,
   updateBlogPost,
   deleteBlogPost,
+  sanitizePostContent,
+  formatSocialUrl,
 } from './blogUtils';
 import { BlogPost } from '../data/blogData';
 
@@ -23,11 +25,11 @@ const mockPosts: BlogPost[] = [
     content: '<p>A positive attitude means thinking positively...</p>',
     snippet: 'A positive attitude means thinking positively...',
     author: {
-      name: 'Prof. Sulekh Kumar',
-      title: 'Assistant Professor',
+      name: 'Shruti Kumari',
+      title: 'Author',
       avatar: 'avatar.jpg',
     },
-    url: 'https://example.com/1',
+    url: '',
     initialCommentCount: 1,
   },
   {
@@ -38,11 +40,11 @@ const mockPosts: BlogPost[] = [
     content: '<p>Hum bhi dariya hain, humein apna hunar maloom hai</p>',
     snippet: 'Hum bhi dariya hain, humein apna hunar maloom hai',
     author: {
-      name: 'Prof. Sulekh Kumar',
-      title: 'Assistant Professor',
+      name: 'Shruti Kumari',
+      title: 'Author',
       avatar: 'avatar.jpg',
     },
-    url: 'https://example.com/2',
+    url: '',
     initialCommentCount: 0,
   },
   {
@@ -53,11 +55,11 @@ const mockPosts: BlogPost[] = [
     content: '<p>Emotion is nothing but the flow of energy...</p>',
     snippet: 'Emotion is nothing but the flow of energy...',
     author: {
-      name: 'Prof. Sulekh Kumar',
-      title: 'Assistant Professor',
+      name: 'Shruti Kumari',
+      title: 'Author',
       avatar: 'avatar.jpg',
     },
-    url: 'https://example.com/3',
+    url: '',
     initialCommentCount: 1,
   },
 ];
@@ -130,4 +132,29 @@ test('deleteBlogPost removes specified post', () => {
   const remaining = deleteBlogPost(mockPosts, 'post-1');
   assert.equal(remaining.length, 2);
   assert.equal(remaining.find((p) => p.id === 'post-1'), undefined);
+});
+
+test('sanitizePostContent strips signatures, blogger urls and trailing spans', () => {
+  const dirty = '<p>Great thoughts.</p><p>&nbsp;&nbsp;</p><p><span><br /></span></p><p><span><span>&nbsp; ---&nbsp; </span><br /></span></p>';
+  assert.equal(sanitizePostContent(dirty), '<p>Great thoughts.</p>');
+
+  const withAuthor = '<p>Work hard.</p><p>By - Shruti Kumari</p>';
+  assert.equal(sanitizePostContent(withAuthor), '<p>Work hard.</p>');
+
+  const withOldAuthor = '<p>Positivity.</p><p>--- Prof. Sulekh Kumar</p>';
+  assert.equal(sanitizePostContent(withOldAuthor), '<p>Positivity.</p>');
+
+  const withBlogger = '<p>Check <a href="https://sulekh194971.blogspot.com">Blog</a> and <a href="https://blogger.com/img"><img src="pic.jpg"/></a></p>';
+  assert.equal(sanitizePostContent(withBlogger), '<p>Check  and <img src="pic.jpg"/></p>');
+});
+
+test('formatSocialUrl formats social media handles and links properly', () => {
+  assert.equal(formatSocialUrl('instagram', '@shruti'), 'https://instagram.com/shruti');
+  assert.equal(formatSocialUrl('instagram', 'https://instagram.com/custom'), 'https://instagram.com/custom');
+  assert.equal(formatSocialUrl('twitter', '@shrutiresearch'), 'https://x.com/shrutiresearch');
+  assert.equal(formatSocialUrl('youtube', 'mychannel'), 'https://youtube.com/@mychannel');
+  assert.equal(formatSocialUrl('whatsapp', '919876543210'), 'https://wa.me/919876543210');
+  assert.equal(formatSocialUrl('email', 'author@blog.com'), 'mailto:author@blog.com');
+  assert.equal(formatSocialUrl('website', 'mywebsite.org'), 'https://mywebsite.org');
+  assert.equal(formatSocialUrl('unknown', ''), '');
 });

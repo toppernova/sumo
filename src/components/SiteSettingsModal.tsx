@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Settings, Upload, Image as ImageIcon } from 'lucide-react';
+import { X, Save, Settings, Upload, Image as ImageIcon, Palette, Check } from 'lucide-react';
 import { SiteSettings } from '../data/blogData';
 
 interface SiteSettingsModalProps {
@@ -8,6 +8,19 @@ interface SiteSettingsModalProps {
   settings: SiteSettings;
   onSave: (newSettings: SiteSettings) => void;
 }
+
+const PRESET_BG_COLORS = [
+  { name: 'Default Aqua', hex: '#58c6d5' },
+  { name: 'Ocean Cyan', hex: '#00acc1' },
+  { name: 'Deep Royal Teal', hex: '#0f766e' },
+  { name: 'Slate Navy', hex: '#1e293b' },
+  { name: 'Midnight Black', hex: '#0f172a' },
+  { name: 'Emerald Forest', hex: '#047857' },
+  { name: 'Warm Amber', hex: '#d97706' },
+  { name: 'Royal Indigo', hex: '#4338ca' },
+  { name: 'Soft Slate', hex: '#334155' },
+  { name: 'Subtle Gray', hex: '#e2e8f0' },
+];
 
 const PRESET_BANNERS = [
   {
@@ -37,12 +50,14 @@ export const SiteSettingsModal: React.FC<SiteSettingsModalProps> = ({
   const [siteTitle, setSiteTitle] = useState('');
   const [tagline, setTagline] = useState('');
   const [headerBgImage, setHeaderBgImage] = useState('');
+  const [backgroundColor, setBackgroundColor] = useState('#58c6d5');
 
   useEffect(() => {
     if (settings) {
       setSiteTitle(settings.siteTitle || '');
       setTagline(settings.tagline || '');
       setHeaderBgImage(settings.headerBgImage || '/ocean-header.jpg');
+      setBackgroundColor(settings.backgroundColor || '#58c6d5');
     }
   }, [settings, isOpen]);
 
@@ -61,12 +76,21 @@ export const SiteSettingsModal: React.FC<SiteSettingsModalProps> = ({
     }
   };
 
+  const handleColorChange = (val: string) => {
+    let clean = val.trim();
+    if (clean && !clean.startsWith('#') && /^[0-9a-fA-F]{3,8}$/.test(clean)) {
+      clean = `#${clean}`;
+    }
+    setBackgroundColor(clean);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave({
       siteTitle: siteTitle.trim() || 'Motivation, Education and Research',
       tagline: tagline.trim(),
       headerBgImage: headerBgImage || '/ocean-header.jpg',
+      backgroundColor: backgroundColor.trim() || '#58c6d5',
     });
     onClose();
   };
@@ -99,22 +123,99 @@ export const SiteSettingsModal: React.FC<SiteSettingsModalProps> = ({
         {/* Body */}
         <form onSubmit={handleSubmit} className="flex flex-col grow overflow-hidden">
           <div className="p-6 overflow-y-auto space-y-5 grow">
-            {/* Banner Live Preview */}
+            {/* Banner & Background Live Preview */}
             <div>
               <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
-                Header Live Preview
+                Header & Background Live Preview
               </label>
               <div
-                className="h-32 rounded-lg overflow-hidden relative p-4 flex flex-col justify-center items-center text-center bg-cover bg-center border border-gray-200 shadow-inner"
-                style={{ backgroundImage: `url('${headerBgImage}')` }}
+                className="p-3 rounded-lg border border-gray-300 shadow-inner transition-colors duration-300"
+                style={{ backgroundColor: backgroundColor || '#58c6d5' }}
               >
-                <div className="absolute inset-0 bg-black/20" />
-                <h3 className="font-damion text-2xl text-white drop-shadow-md relative z-10">
-                  {siteTitle || 'Motivation, Education and Research'}
-                </h3>
-                <p className="text-white/90 text-xs font-light max-w-sm drop-shadow relative z-10 mt-1 line-clamp-1">
-                  {tagline || 'Your blog tagline here...'}
-                </p>
+                <div
+                  className="h-28 rounded-md overflow-hidden relative p-4 flex flex-col justify-center items-center text-center bg-cover bg-center border border-white/30 shadow-md"
+                  style={{ backgroundImage: `url('${headerBgImage}')` }}
+                >
+                  <div className="absolute inset-0 bg-black/20" />
+                  <h3 className="font-damion text-2xl text-white drop-shadow-md relative z-10">
+                    {siteTitle || 'Motivation, Education and Research'}
+                  </h3>
+                  <p className="text-white/90 text-xs font-light max-w-sm drop-shadow relative z-10 mt-1 line-clamp-1">
+                    {tagline || 'Your blog tagline here...'}
+                  </p>
+                </div>
+                <div className="mt-2 mx-auto max-w-xs bg-white/95 backdrop-blur-xs py-1.5 px-3 rounded shadow-xs text-center text-[10px] text-gray-500 font-medium">
+                  Page Background: {backgroundColor || '#58c6d5'}
+                </div>
+              </div>
+            </div>
+
+            {/* Background Colour Chooser */}
+            <div className="p-4 bg-gray-50/80 rounded-lg border border-gray-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Palette className="w-4 h-4 text-[#00acc1]" />
+                  <label className="text-xs font-bold text-gray-800 uppercase tracking-wide">
+                    Website Background Colour (पृष्ठभूमि रंग कोड)
+                  </label>
+                </div>
+                <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-white border border-gray-300 text-gray-800">
+                  {backgroundColor || '#58c6d5'}
+                </span>
+              </div>
+
+              {/* Color picker input + HEX input */}
+              <div className="flex items-center gap-3">
+                <div className="relative flex items-center justify-center shrink-0">
+                  <input
+                    type="color"
+                    value={backgroundColor.startsWith('#') && backgroundColor.length === 7 ? backgroundColor : '#58c6d5'}
+                    onChange={(e) => setBackgroundColor(e.target.value)}
+                    className="w-10 h-10 rounded-lg cursor-pointer border border-gray-300 p-0.5 bg-white shadow-xs"
+                    title="Click to open color picker"
+                  />
+                </div>
+                <div className="grow">
+                  <input
+                    type="text"
+                    value={backgroundColor}
+                    onChange={(e) => handleColorChange(e.target.value)}
+                    placeholder="#58c6d5"
+                    className="w-full text-xs font-mono uppercase px-3 py-2 bg-white border border-gray-300 rounded focus:ring-2 focus:ring-[#00acc1] focus:outline-none"
+                  />
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    Apna pasandeeda HEX color code enter karein ya left icon par click karke color chunein.
+                  </p>
+                </div>
+              </div>
+
+              {/* Preset Palettes */}
+              <div>
+                <p className="text-[11px] text-gray-600 font-medium mb-1.5">Preset Color Palettes:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {PRESET_BG_COLORS.map((c) => {
+                    const isSelected = backgroundColor.toLowerCase() === c.hex.toLowerCase();
+                    return (
+                      <button
+                        key={c.hex}
+                        type="button"
+                        onClick={() => setBackgroundColor(c.hex)}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] rounded-full border transition cursor-pointer ${
+                          isSelected
+                            ? 'border-[#00acc1] bg-teal-50 text-teal-800 font-bold ring-1 ring-[#00acc1]'
+                            : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                        }`}
+                      >
+                        <span
+                          className="w-3.5 h-3.5 rounded-full border border-black/15 shadow-2xs"
+                          style={{ backgroundColor: c.hex }}
+                        />
+                        <span>{c.name}</span>
+                        {isSelected && <Check size={11} className="text-[#00acc1]" />}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 

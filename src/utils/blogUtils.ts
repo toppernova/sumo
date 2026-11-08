@@ -236,3 +236,77 @@ export function updateBlogPost(
 export function deleteBlogPost(posts: BlogPost[], id: string): BlogPost[] {
   return posts.filter((p) => p.id !== id);
 }
+
+export function sanitizePostContent(html: string): string {
+  if (!html) return '';
+  let s = html;
+
+  // 1. Remove Blogger links, unwrapping images so photos remain visible without Blogger URL
+  s = s.replace(/<a[^>]+href=["'][^"']*(?:blogspot|blogger)[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi, (_, inner) => {
+    return /<img/i.test(inner) ? inner : '';
+  });
+  s = s.replace(/https?:\/\/[a-z0-9\-.]*blogspot\.com[^\s"'<>()]*/gi, '');
+
+  // 2. Strip author signatures and lines containing dashes/author names
+  s = s.replace(/<p[^>]*>(?:<span[^>]*>|<span>|&nbsp;|\s|<br\s*\/?>|-|—|–)*?(?:Prof\.?\s*)?(?:Sulekh|Shruti)?\s*Kumar[i]?(?:<\/span>|&nbsp;|\s|<br\s*\/?>|-|—|–)*?<\/p>/gi, '');
+  s = s.replace(/<div[^>]*>(?:<span[^>]*>|<span>|&nbsp;|\s|<br\s*\/?>|-|—|–)*?(?:Prof\.?\s*)?(?:Sulekh|Shruti)?\s*Kumar[i]?(?:<\/span>|&nbsp;|\s|<br\s*\/?>|-|—|–)*?<\/div>/gi, '');
+  s = s.replace(/<p[^>]*>(?:<span[^>]*>|<span>|&nbsp;|\s|<br\s*\/?>|-|—|–)+<\/p>/gi, '');
+  s = s.replace(/<span[^>]*>(?:&nbsp;|\s|<br\s*\/?>|-|—|–)+<\/span>/gi, '');
+
+  // 3. Any remaining signature patterns
+  s = s.replace(/(?:---|--|-----|—|–|By\s*[-–:]|Author\s*[-–:]|Writer\s*[-–:])\s*(?:Prof\.?\s*)?(?:Sulekh|Shruti)?\s*Kumar[i]?/gi, '');
+  s = s.replace(/(?:Prof\.?\s*)?(?:Sulekh|Shruti)\s*Kumar[i]?/gi, '');
+  s = s.replace(/UGC\s*NET\s*\/?\s*JRF/gi, '');
+  s = s.replace(/<div[^>]*>[\s*&nbsp;—–-]+<\/div>/gi, '');
+
+  // 4. Remove empty tags
+  s = s.replace(/<span[^>]*>\s*<\/span>/gi, '');
+  s = s.replace(/<p[^>]*>\s*<\/p>/gi, '');
+  s = s.replace(/<div><b><\/b><\/div>/gi, '');
+
+  // 5. Trim trailing junk: empty divs, empty paragraphs, trailing brs, trailing spans, trailing spaces
+  let prev;
+  do {
+    prev = s;
+    s = s.replace(/(?:<div[^>]*>(?:<br\s*\/?>|&nbsp;|\s|<b[^>]*><\/b>)*<\/div>|<p[^>]*>(?:<br\s*\/?>|&nbsp;|\s|<span>|<\/span>)*<\/p>|<br\s*\/?>|&nbsp;|\s|<\/?span[^>]*>|<\/?div[^>]*>)+$/gi, '');
+  } while (s !== prev);
+
+  return s.trim();
+}
+
+export function formatSocialUrl(platform: string, input: string): string {
+  const val = (input || '').trim();
+  if (!val) return '';
+
+  if (val.startsWith('http://') || val.startsWith('https://') || val.startsWith('mailto:')) {
+    return val;
+  }
+
+  const cleanHandle = val.replace(/^@/, '');
+
+  switch (platform.toLowerCase()) {
+    case 'instagram':
+      return `https://instagram.com/${cleanHandle}`;
+    case 'twitter':
+    case 'x':
+      return `https://x.com/${cleanHandle}`;
+    case 'facebook':
+      return `https://facebook.com/${cleanHandle}`;
+    case 'linkedin':
+      return cleanHandle.includes('in/') ? `https://linkedin.com/${cleanHandle}` : `https://linkedin.com/in/${cleanHandle}`;
+    case 'youtube':
+      return cleanHandle.startsWith('@') ? `https://youtube.com/${cleanHandle}` : `https://youtube.com/@${cleanHandle}`;
+    case 'github':
+      return `https://github.com/${cleanHandle}`;
+    case 'telegram':
+      return `https://t.me/${cleanHandle}`;
+    case 'whatsapp': {
+      const digits = val.replace(/[^0-9]/g, '');
+      return `https://wa.me/${digits}`;
+    }
+    case 'email':
+      return `mailto:${val}`;
+    default:
+      return `https://${val}`;
+  }
+}

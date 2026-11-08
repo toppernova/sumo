@@ -22,6 +22,7 @@ import {
   createBlogPost,
   updateBlogPost,
   deleteBlogPost,
+  sanitizePostContent,
 } from './utils/blogUtils';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
@@ -81,7 +82,7 @@ const INITIAL_COMMENTS: Record<string, Comment[]> = {
 };
 
 export default function App() {
-  // 1. Posts state with localStorage persistence
+  // 1. Posts state with localStorage persistence (All posts set to writer Shruti Kumari, cleaned content & no blogger links)
   const [posts, setPosts] = useState<BlogPost[]>(() => {
     let rawPosts: BlogPost[] = BLOG_POSTS;
     try {
@@ -92,30 +93,37 @@ export default function App() {
     } catch {
       // fallback
     }
-    // Clean old author details from posts since profile data was deleted
-    return rawPosts.map((p) => {
-      if (p.author?.name === 'Prof. Sulekh Kumar') {
-        return {
-          ...p,
-          author: {
-            name: '',
-            title: '',
-            avatar: '',
-          },
-        };
-      }
-      return p;
-    });
+    // Deep sanitize all posts: writer name "Shruti Kumari", clean content (no signatures), strip blogger links
+    const sanitized = rawPosts.map((p) => ({
+      ...p,
+      url: '',
+      content: sanitizePostContent(p.content),
+      snippet: p.snippet.replace(/(?:Prof\.?\s*)?(?:Sulekh|Shruti)\s*Kumar[i]?/gi, '').trim(),
+      author: {
+        ...p.author,
+        name: 'Shruti Kumari',
+      },
+    }));
+
+    // Update localStorage immediately so any old browser cache is cleaned instantly
+    try {
+      localStorage.setItem(STORAGE_KEY_POSTS, JSON.stringify(sanitized));
+    } catch {}
+
+    return sanitized;
   });
 
-  // 2. Author Profile state with localStorage persistence (defaults to empty)
+  // 2. Author Profile state with localStorage persistence (defaults to Shruti Kumari)
   const [profile, setProfile] = useState<AuthorProfile>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_AUTHOR);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && parsed.name && parsed.name !== 'Prof. Sulekh Kumar') {
-          return parsed;
+          return {
+            ...parsed,
+            bloggerProfileUrl: '',
+          };
         } else {
           localStorage.removeItem(STORAGE_KEY_AUTHOR);
         }
@@ -123,7 +131,7 @@ export default function App() {
     } catch {
       // fallback
     }
-    return EMPTY_AUTHOR_PROFILE;
+    return AUTHOR_PROFILE;
   });
 
   // 3. Site Settings state (Title, Tagline, Banner)
@@ -213,7 +221,18 @@ export default function App() {
     try {
       const cloudPosts = await fetchSupabasePosts();
       if (cloudPosts && cloudPosts.length > 0) {
-        setPosts(cloudPosts);
+        setPosts(
+          cloudPosts.map((p) => ({
+            ...p,
+            url: '',
+            content: sanitizePostContent(p.content),
+            snippet: p.snippet.replace(/(?:Prof\.?\s*)?(?:Sulekh|Shruti)\s*Kumar[i]?/gi, '').trim(),
+            author: {
+              ...p.author,
+              name: p.author?.name === 'Prof. Sulekh Kumar' || !p.author?.name ? 'Shruti Kumari' : p.author.name,
+            },
+          }))
+        );
       }
       const cloudProfile = await fetchSupabaseProfile();
       if (cloudProfile && cloudProfile.name && cloudProfile.name !== 'Prof. Sulekh Kumar') {
@@ -636,7 +655,10 @@ export default function App() {
   const hasMorePosts = visibleCount < filteredPosts.length;
 
   return (
-    <div className="min-h-screen bg-[#58c6d5] flex flex-col font-roboto selection:bg-[#00acc1] selection:text-white">
+    <div
+      className="min-h-screen flex flex-col font-roboto selection:bg-[#00acc1] selection:text-white transition-colors duration-300"
+      style={{ backgroundColor: siteSettings.backgroundColor || '#58c6d5' }}
+    >
       {/* Blogger Top Management Bar - ONLY VISIBLE TO AUTHENTICATED ADMIN */}
       {isAdmin && (
         <AdminBar
