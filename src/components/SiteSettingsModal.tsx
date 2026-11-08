@@ -56,8 +56,17 @@ export const SiteSettingsModal: React.FC<SiteSettingsModalProps> = ({
     if (settings) {
       setSiteTitle(settings.siteTitle || '');
       setTagline(settings.tagline || '');
-      setHeaderBgImage(settings.headerBgImage || '/ocean-header.jpg');
-      setBackgroundColor(settings.backgroundColor || '#58c6d5');
+      const rawImg = settings.headerBgImage || '/ocean-header.jpg';
+      setHeaderBgImage(rawImg.replace(/#bgcolor=[^&]*/, ''));
+
+      let color = settings.backgroundColor;
+      if (!color || color === '#58c6d5') {
+        try {
+          const savedColor = localStorage.getItem('sulekh_blog_chosen_bg_color');
+          if (savedColor) color = savedColor;
+        } catch {}
+      }
+      setBackgroundColor(color || '#58c6d5');
     }
   }, [settings, isOpen]);
 

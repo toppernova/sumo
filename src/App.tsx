@@ -60,6 +60,8 @@ const STORAGE_KEY_POSTS = 'sulekh_blog_posts_v2';
 const STORAGE_KEY_AUTHOR = 'sulekh_blog_author_v2';
 const STORAGE_KEY_SETTINGS = 'sulekh_blog_settings_v2';
 const STORAGE_KEY_COMMENTS = 'sulekh_blog_comments_v2';
+const STORAGE_KEY_BG_COLOR = 'sulekh_blog_chosen_bg_color';
+const STORAGE_KEY_SOCIALS = 'sulekh_blog_chosen_social_links';
 const POSTS_PER_PAGE = 6;
 
 const INITIAL_COMMENTS: Record<string, Comment[]> = {
@@ -120,9 +122,15 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && parsed.name && parsed.name !== 'Prof. Sulekh Kumar') {
+          let socials = parsed.socialLinks || {};
+          try {
+            const savedSocials = localStorage.getItem(STORAGE_KEY_SOCIALS);
+            if (savedSocials) socials = { ...socials, ...JSON.parse(savedSocials) };
+          } catch {}
           return {
             ...parsed,
             bloggerProfileUrl: '',
+            socialLinks: socials,
           };
         } else {
           localStorage.removeItem(STORAGE_KEY_AUTHOR);
@@ -134,15 +142,29 @@ export default function App() {
     return AUTHOR_PROFILE;
   });
 
-  // 3. Site Settings state (Title, Tagline, Banner)
+  // 3. Site Settings state (Title, Tagline, Banner, Background Color)
   const [siteSettings, setSiteSettings] = useState<SiteSettings>(() => {
+    let settings = DEFAULT_SITE_SETTINGS;
     try {
       const saved = localStorage.getItem(STORAGE_KEY_SETTINGS);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        settings = JSON.parse(saved);
+      }
     } catch {
       // fallback
     }
-    return DEFAULT_SITE_SETTINGS;
+
+    try {
+      const savedColor = localStorage.getItem(STORAGE_KEY_BG_COLOR);
+      if (savedColor && savedColor.trim()) {
+        settings = {
+          ...settings,
+          backgroundColor: savedColor.trim(),
+        };
+      }
+    } catch {}
+
+    return settings;
   });
 
   // 4. Comments state with localStorage persistence
@@ -236,11 +258,54 @@ export default function App() {
       }
       const cloudProfile = await fetchSupabaseProfile();
       if (cloudProfile && cloudProfile.name && cloudProfile.name !== 'Prof. Sulekh Kumar') {
-        setProfile(cloudProfile);
+        setProfile((current) => {
+          let localSocials = {};
+          try {
+            const savedSocials = localStorage.getItem(STORAGE_KEY_SOCIALS);
+            if (savedSocials) localSocials = JSON.parse(savedSocials);
+          } catch {}
+
+          const effectiveSocials =
+            cloudProfile.socialLinks && Object.keys(cloudProfile.socialLinks).length > 0
+              ? cloudProfile.socialLinks
+              : (Object.keys(localSocials).length > 0 ? localSocials : current.socialLinks || {});
+
+          const mergedProfile = {
+            ...cloudProfile,
+            socialLinks: effectiveSocials,
+          };
+          try {
+            localStorage.setItem(STORAGE_KEY_AUTHOR, JSON.stringify(mergedProfile));
+            localStorage.setItem(STORAGE_KEY_SOCIALS, JSON.stringify(effectiveSocials));
+          } catch {}
+          return mergedProfile;
+        });
       }
       const cloudSettings = await fetchSupabaseSettings();
       if (cloudSettings && cloudSettings.siteTitle) {
-        setSiteSettings(cloudSettings);
+        setSiteSettings((current) => {
+          let localColor = '';
+          try {
+            localColor = localStorage.getItem(STORAGE_KEY_BG_COLOR) || '';
+          } catch {}
+
+          const chosenColor =
+            cloudSettings.backgroundColor && cloudSettings.backgroundColor !== '#58c6d5'
+              ? cloudSettings.backgroundColor
+              : localColor || current.backgroundColor || cloudSettings.backgroundColor || '#58c6d5';
+
+          const merged: SiteSettings = {
+            ...cloudSettings,
+            backgroundColor: chosenColor,
+          };
+
+          try {
+            localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(merged));
+            localStorage.setItem(STORAGE_KEY_BG_COLOR, chosenColor);
+          } catch {}
+
+          return merged;
+        });
       }
     } catch (e) {
       console.warn('Error loading from Supabase:', e);
@@ -555,19 +620,30 @@ export default function App() {
       );
     }
 
+    try {
+      localStorage.setItem(STORAGE_KEY_AUTHOR, JSON.stringify(newProfile));
+      localStorage.setItem(STORAGE_KEY_SOCIALS, JSON.stringify(newProfile.socialLinks || {}));
+    } catch {}
+
     showSyncNotification('Author profile updated successfully across all sections & posts!');
   };
 
-  const handleSaveSiteSettings = (newSettings: SiteSettings) => {
+  const handleSaveSiteSettings = async (newSettings: SiteSettings) => {
     if (!isAdmin) {
-      alert('Access Denied: Only authenticated admin can change site title.');
+      alert('Access Denied: Only authenticated admin can change site settings.');
       return;
     }
+    const color = newSettings.backgroundColor?.trim() || '#58c6d5';
+    try {
+      localStorage.setItem(STORAGE_KEY_BG_COLOR, color);
+      localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(newSettings));
+    } catch {}
+
     setSiteSettings(newSettings);
     if (isSupabaseConnected) {
-      upsertSupabaseSettings(newSettings);
+      await upsertSupabaseSettings(newSettings);
     }
-    showSyncNotification('Blog title, subtitle & banner updated across the entire site!');
+    showSyncNotification('Blog settings & background colour updated across the entire site!');
   };
 
   // Optional: Restore original demo posts if needed

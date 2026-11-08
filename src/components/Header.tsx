@@ -34,7 +34,7 @@ export const Header: React.FC<HeaderProps> = ({
       <div
         className="absolute inset-0 bg-cover bg-top bg-no-repeat transition-all duration-500"
         style={{
-          backgroundImage: `url('${headerBgImage || '/ocean-header.jpg'}')`,
+          backgroundImage: `url('${(headerBgImage || '/ocean-header.jpg').replace(/#bgcolor=[^&]*/, '')}')`,
         }}
       />
       {/* Subtle overlay for text legibility */}

@@ -568,6 +568,24 @@ export async function fetchSupabaseProfile(): Promise<AuthorProfile | null> {
 
     if (error || !data) return null;
 
+    let socials = data.social_links || {};
+    let bloggerUrl = data.blogger_profile_url || '';
+
+    // Fallback: If social_links column is missing on DB, extract from blogger_profile_url JSON fallback
+    if ((!socials || Object.keys(socials).length === 0) && bloggerUrl.startsWith('json:')) {
+      try {
+        socials = JSON.parse(bloggerUrl.slice(5));
+        bloggerUrl = '';
+      } catch {}
+    }
+
+    if ((!socials || Object.keys(socials).length === 0) && typeof window !== 'undefined') {
+      try {
+        const localSaved = localStorage.getItem('sulekh_blog_chosen_social_links');
+        if (localSaved) socials = JSON.parse(localSaved);
+      } catch {}
+    }
+
     return {
       name: data.name || '',
       fullTitle: data.full_title || '',
@@ -577,8 +595,8 @@ export async function fetchSupabaseProfile(): Promise<AuthorProfile | null> {
       education: data.education || [],
       currentRole: data.current_job_role || data.current_role || '',
       researchInterests: data.research_interests || [],
-      bloggerProfileUrl: data.blogger_profile_url || '',
-      socialLinks: data.social_links || {},
+      bloggerProfileUrl: bloggerUrl,
+      socialLinks: socials,
     };
   } catch {
     return null;
@@ -589,6 +607,16 @@ export async function upsertSupabaseProfile(profile: AuthorProfile): Promise<boo
   if (!isSupabaseConfigured()) return false;
   const client = getSupabaseClient();
   if (!client) return false;
+
+  const hasSocials = profile.socialLinks && Object.keys(profile.socialLinks).length > 0;
+  const bloggerFallback = hasSocials ? `json:${JSON.stringify(profile.socialLinks)}` : (profile.bloggerProfileUrl || '');
+
+  // Save to local storage backup immediately
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem('sulekh_blog_chosen_social_links', JSON.stringify(profile.socialLinks || {}));
+    } catch {}
+  }
 
   try {
     const payload: any = {
@@ -601,7 +629,7 @@ export async function upsertSupabaseProfile(profile: AuthorProfile): Promise<boo
       education: profile.education,
       current_job_role: profile.currentRole,
       research_interests: profile.researchInterests,
-      blogger_profile_url: profile.bloggerProfileUrl,
+      blogger_profile_url: bloggerFallback,
       social_links: profile.socialLinks || {},
       updated_at: new Date().toISOString(),
     };
@@ -633,11 +661,32 @@ export async function fetchSupabaseSettings(): Promise<SiteSettings | null> {
 
     if (error || !data) return null;
 
+    // Check if background color was encoded in header_bg_image fragment or direct column
+    let detectedColor = data.background_color || '';
+    let cleanHeaderImage = data.header_bg_image || '/ocean-header.jpg';
+
+    if (cleanHeaderImage.includes('#bgcolor=')) {
+      const match = cleanHeaderImage.match(/#bgcolor=([^&]+)/);
+      if (match) {
+        if (!detectedColor) {
+          detectedColor = decodeURIComponent(match[1]);
+        }
+        cleanHeaderImage = cleanHeaderImage.replace(/#bgcolor=[^&]*/, '');
+      }
+    }
+
+    // Also check local storage backup if available in browser
+    if (!detectedColor && typeof window !== 'undefined') {
+      try {
+        detectedColor = localStorage.getItem('sulekh_blog_chosen_bg_color') || '';
+      } catch {}
+    }
+
     return {
       siteTitle: data.site_title || 'Motivation, Education and Research',
       tagline: data.tagline || '',
-      headerBgImage: data.header_bg_image || '/ocean-header.jpg',
-      backgroundColor: data.background_color || '#58c6d5',
+      headerBgImage: cleanHeaderImage,
+      backgroundColor: detectedColor || '#58c6d5',
     };
   } catch {
     return null;
@@ -649,19 +698,35 @@ export async function upsertSupabaseSettings(settings: SiteSettings): Promise<bo
   const client = getSupabaseClient();
   if (!client) return false;
 
+  const color = settings.backgroundColor?.trim() || '#58c6d5';
+
+  // Embed background color into header_bg_image URL fragment as universal fallback for DBs without column
+  let headerWithColor = (settings.headerBgImage || '/ocean-header.jpg').replace(/#bgcolor=[^&]*/, '');
+  if (color && color !== '#58c6d5') {
+    headerWithColor += `#bgcolor=${encodeURIComponent(color)}`;
+  }
+
+  // Also save to dedicated localStorage key immediately
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem('sulekh_blog_chosen_bg_color', color);
+    } catch {}
+  }
+
   try {
     const payload: any = {
       id: 'main_settings',
       site_title: settings.siteTitle,
       tagline: settings.tagline,
-      header_bg_image: settings.headerBgImage,
-      background_color: settings.backgroundColor || '#58c6d5',
+      header_bg_image: headerWithColor,
+      background_color: color,
       updated_at: new Date().toISOString(),
     };
 
     const { error } = await client.from('site_settings').upsert(payload);
     if (error && error.message && error.message.includes('background_color')) {
       delete payload.background_color;
+      // header_bg_image still carries the #bgcolor fragment, guaranteeing cloud persistence!
       const retry = await client.from('site_settings').upsert(payload);
       return !retry.error;
     }
